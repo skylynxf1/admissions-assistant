@@ -47,6 +47,12 @@ Copy `.env.example` to `.env.local` and add OpenAI/Supabase credentials when con
 4. Search for destination schools, check multiple options, and choose one priority school.
 5. Pick one or more priority-school majors and read the short requirement outline.
 6. Open the planning playground and drag recommended courses into editable quarter templates.
-7. Add more majors, adjust scenario settings, and show or hide movable workspace panels.
-8. Review plain-language requirements, prerequisite chains, and sample source records.
-9. Ask the grounded advisor a question or export the visible plan as a readable PDF.
+7. Use the simulator to add or remove schools, majors, transcript courses, grades, AP/IB credit, and planned courses.
+8. Change current school/type, residency, enrollment term, maximum quarterly load, summer attendance, and graduation target.
+9. Watch transfer and major eligibility, missing prerequisites, general education, credits, timeline, and open options recalculate.
+10. Save multiple scenarios in the Compare tab, restore any version, or export the visible plan as a readable PDF.
+11. Ask the grounded advisor a question or review the sample source records behind the plan.
+
+## Simulator coverage
+
+The playground keeps all editable inputs in the typed scenario, transcript, and target-school models. The mock simulation service—not the UI—calculates transfer eligibility, major readiness, prerequisite gaps, general-education progress, projected transferable credit, estimated remaining credit, graduation timing, term overloads, GPA, and the academic options that remain open. Saved comparison plans capture the complete scenario and can be restored during the session.

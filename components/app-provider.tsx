@@ -26,12 +26,15 @@ const defaultProfile: StudentProfile = {
 };
 
 const defaultScenario: ScenarioSettings = {
+  currentInstitution: defaultProfile.currentInstitution,
   institutionType: defaultProfile.institutionType,
   residency: defaultProfile.residency,
   targetTransferTerm: defaultProfile.targetTransferTerm,
   preferredCreditLoad: defaultProfile.preferredCreditLoad,
+  graduationTarget: "Spring 2030",
   useExamCredit: true,
   attendSummer: false,
+  plannedCourses: [],
 };
 
 interface PersistedState {
@@ -59,7 +62,7 @@ interface AppContextValue extends PersistedState {
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
-const STORAGE_KEY = "pathwise-prototype-state-v2";
+const STORAGE_KEY = "pathwise-prototype-state-v3";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<PlanningMode>("transfer");
@@ -95,7 +98,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setTranscript(parsed.transcript);
         setTargets(parsed.targets);
         setPrioritySchoolId(parsed.prioritySchoolId || parsed.targets[0]?.schoolId || "uw");
-        setScenario(parsed.scenario);
+        setScenario({ ...defaultScenario, ...parsed.scenario, plannedCourses: parsed.scenario?.plannedCourses ?? [] });
       }
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
@@ -139,6 +142,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setProfileState(nextProfile);
     setScenario((current) => ({
       ...current,
+      currentInstitution: nextProfile.currentInstitution,
       institutionType: nextProfile.institutionType,
       residency: nextProfile.residency,
       targetTransferTerm: nextProfile.targetTransferTerm,

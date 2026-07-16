@@ -107,13 +107,27 @@ export interface TargetSchool {
   majorIds: string[];
 }
 
+export interface PlannedCourse {
+  id: string;
+  course: string;
+  title: string;
+  credits: number;
+  termId: string;
+  termLabel: string;
+  satisfies: string[];
+  source: "recommended" | "custom";
+}
+
 export interface ScenarioSettings {
+  currentInstitution: string;
   institutionType: InstitutionType;
   residency: StudentProfile["residency"];
   targetTransferTerm: string;
   preferredCreditLoad: number;
+  graduationTarget: string;
   useExamCredit: boolean;
   attendSummer: boolean;
+  plannedCourses: PlannedCourse[];
 }
 
 export interface CreditSummary {
@@ -220,6 +234,7 @@ export interface AnalysisResult {
   generatedAt: string;
   dataMode: "sample";
   scenarioLabel: string;
+  simulationSummary: SimulationSummary;
   creditSummary: CreditSummary;
   readiness: ProgramReadiness[];
   requirements: RequirementResult[];
@@ -228,6 +243,35 @@ export interface AnalysisResult {
   recommendations: CourseRecommendation[];
   alerts: AnalysisAlert[];
   citations: Citation[];
+}
+
+export interface SimulationSummary {
+  totalPrograms: number;
+  transferEligiblePrograms: number;
+  majorEligiblePrograms: number;
+  missingPrerequisiteCount: number;
+  generalEducationPercent: number;
+  plannedCredits: number;
+  projectedTransferableCredits: number;
+  estimatedRemainingCredits: number;
+  estimatedGraduationTerm: string;
+  graduationTarget: string;
+  onTrackForGraduationTarget: boolean;
+  termsRemaining: number;
+  openOptionIds: string[];
+  projectedGpa: number;
+  overloadedTermIds: string[];
+}
+
+export interface PlanComparison {
+  id: string;
+  label: string;
+  createdAt: string;
+  prioritySchoolId: string;
+  targets: TargetSchool[];
+  scenario: ScenarioSettings;
+  transcript: TranscriptData;
+  summary: SimulationSummary;
 }
 
 export interface AdvisorMessage {
