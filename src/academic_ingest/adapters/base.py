@@ -20,12 +20,15 @@ class AdapterContext:
     source_page_id: UUID | None = None
     retrieved_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     selected_course_codes: set[str] | None = None
+    selected_program_names: set[str] | None = None
 
 
 @dataclass
 class AdapterResult:
     records: list[Any] = field(default_factory=list)
     requirements: list[Any] = field(default_factory=list)
+    outcome_statistics: list[Any] = field(default_factory=list)
+    conflict_candidates: list[Any] = field(default_factory=list)
     discovered_links: list[str] = field(default_factory=list)
     warnings: list[PipelineIssue] = field(default_factory=list)
     review_tasks: list[ReviewTask] = field(default_factory=list)
