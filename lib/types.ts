@@ -8,6 +8,17 @@ export type PlanningMode =
   | "study-abroad";
 
 export type ConfidenceLevel = "high" | "medium" | "low";
+export type VerificationStatus =
+  | "confirmed"
+  | "likely"
+  | "unclear"
+  | "manual-evaluation"
+  | "conflicting";
+export type VerificationOffice =
+  | "Admissions"
+  | "Transfer credit office"
+  | "Department advisor"
+  | "Residency office";
 export type CourseStatus = "completed" | "in-progress" | "planned";
 export type RequirementState = "complete" | "in-progress" | "missing" | "uncertain";
 export type EligibilityStatus =
@@ -225,9 +236,33 @@ export interface AnalysisAlert {
   title: string;
   message: string;
   confidence: ConfidenceLevel;
-  office: "Admissions" | "Transfer credit office" | "Department advisor" | "Residency office";
+  office: VerificationOffice;
   canDraftEmail: boolean;
   citationIds: string[];
+}
+
+export interface VerificationSourceCheck {
+  citationId: string;
+  outcome: "supports" | "does-not-address" | "conflicts";
+  note: string;
+}
+
+export interface VerificationItem {
+  id: string;
+  status: VerificationStatus;
+  title: string;
+  conclusion: string;
+  explanation: string;
+  sourceCourse: string;
+  sourceInstitution: string;
+  sourceTerm: string;
+  destinationSchoolId: string;
+  /** Only populated when a saved source explicitly contains the destination mapping. */
+  destinationCourse?: string;
+  question: string;
+  office: VerificationOffice;
+  sourceChecks: VerificationSourceCheck[];
+  canDraftEmail: boolean;
 }
 
 export interface AnalysisResult {
@@ -242,6 +277,7 @@ export interface AnalysisResult {
   prerequisiteChains: PrerequisiteChain[];
   recommendations: CourseRecommendation[];
   alerts: AnalysisAlert[];
+  verifications: VerificationItem[];
   citations: Citation[];
 }
 
@@ -293,6 +329,12 @@ export interface DraftEmail {
   toOffice: string;
   subject: string;
   body: string;
+  context: {
+    course: string;
+    institution: string;
+    term: string;
+    question: string;
+  };
 }
 
 export interface AcademicAnalysisInput {

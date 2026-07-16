@@ -16,6 +16,8 @@ The prototype deliberately runs on labeled sample data. Connect production intel
    - Keep credit arithmetic, duplicate detection, prerequisite traversal, and requirement totals deterministic.
    - Use GPT-5.6 for ambiguous policy interpretation, footnotes, cross-source conflicts, and explanations.
    - Require strict `AnalysisResult` output and reject uncited policy conclusions.
+   - Preserve the five verification states and require an explicit source check before a destination course mapping can be returned.
+   - Route unresolved and conflicting items through the existing exact-course, institution, term, question, office, and draft-email model.
 
 4. **Scenario simulation**
    - Reuse the same source bundle and change only explicit scenario fields.

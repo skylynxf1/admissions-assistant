@@ -18,6 +18,7 @@ import type {
   SchoolDefinition,
   SimulationSummary,
   TranscriptData,
+  VerificationItem,
 } from "@/lib/types";
 import type {
   AcademicRecordNormalizer,
@@ -30,6 +31,7 @@ import type {
   ScenarioSimulator,
   TranscriptParser,
   UncertaintyEscalationHandler,
+  VerificationEvaluator,
 } from "@/lib/services/interfaces";
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -136,7 +138,7 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
         sourceCourse: "ENGL& 101",
         sourceInstitution: "Bellevue College",
         destinationSchoolId: "uw",
-        destinationCourse: "English composition credit",
+        destinationCourse: "No exact course number stored",
         category: "Writing",
         result: "Likely satisfies one composition requirement in this demo.",
         confidence: "high",
@@ -149,9 +151,9 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
         sourceCourse: "CS 141",
         sourceInstitution: "Bellevue College",
         destinationSchoolId: "uw",
-        destinationCourse: "Possible CSE 121 equivalent",
+        destinationCourse: "No verified course mapping",
         category: "Major prerequisite",
-        result: "General transfer credit is likely, but the department mapping is uncertain.",
+        result: "No course equivalency is stored; department evaluation is required.",
         confidence: "medium",
         reasoning: "The sample public mapping does not resolve the department-level prerequisite use.",
         confirmationRecommended: true,
@@ -162,9 +164,9 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
         sourceCourse: "MATH& 151",
         sourceInstitution: "Bellevue College",
         destinationSchoolId: "berkeley",
-        destinationCourse: "Possible MATH 1A articulation",
+        destinationCourse: "No verified course mapping",
         category: "Quantitative / major prerequisite",
-        result: "Likely transferable; exact major applicability needs confirmation.",
+        result: "No course equivalency is stored; transfer and major applicability are unresolved.",
         confidence: "medium",
         reasoning: "This demo does not contain an official cross-state articulation agreement.",
         confirmationRecommended: true,
@@ -175,9 +177,9 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
         sourceCourse: "ECON& 201",
         sourceInstitution: "Bellevue College",
         destinationSchoolId: "berkeley",
-        destinationCourse: "Lower-division economics credit",
+        destinationCourse: "No verified course mapping",
         category: "Social science",
-        result: "Estimated to satisfy lower-division social science credit.",
+        result: "No exact transfer-credit or requirement result is stored.",
         confidence: "medium",
         reasoning: "Subject area aligns; direct articulation is not present in the sample dataset.",
         confirmationRecommended: true,
@@ -188,9 +190,9 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
         sourceCourse: "SOCW 2010",
         sourceInstitution: "Seattle University",
         destinationSchoolId: "ucla",
-        destinationCourse: "General social science elective",
+        destinationCourse: "No verified course mapping",
         category: "Social science / diversity",
-        result: "May transfer as elective credit; category use is unclear.",
+        result: "No exact transfer-credit or requirement result is stored.",
         confidence: "low",
         reasoning: "No direct fictional equivalency is available for this private-school course.",
         confirmationRecommended: true,
@@ -199,6 +201,134 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
     ];
 
     return templates.filter((item) => selectedSchools.has(item.destinationSchoolId));
+  }
+}
+
+// MOCK IMPLEMENTATION: every conclusion is limited to an explicit saved sample record.
+// A destination course is never inferred when the stored sources do not name one.
+export class MockVerificationEvaluator implements VerificationEvaluator {
+  async evaluate(input: AcademicAnalysisInput, equivalencies: CourseEquivalency[]): Promise<VerificationItem[]> {
+    const selectedSchools = new Set(input.targets.map((target) => target.schoolId));
+    const course = (code: string, institution?: string) => input.transcript.courses.find(
+      (item) => item.code.toUpperCase() === code.toUpperCase()
+        && (!institution || item.institution === institution),
+    );
+    const buildContext = (code: string, institution?: string) => {
+      const match = course(code, institution);
+      return {
+        sourceCourse: match?.code ?? code,
+        sourceInstitution: match?.institution ?? institution ?? input.scenario.currentInstitution,
+        sourceTerm: match?.term ?? "Term not found in reviewed record",
+      };
+    };
+    const storedDestination = (id: string) => {
+      const match = equivalencies.find((item) => item.id === id);
+      return match && !match.destinationCourse.startsWith("No ") ? match.destinationCourse : undefined;
+    };
+
+    const items: VerificationItem[] = [];
+    if (selectedSchools.has("uw")) {
+      items.push(
+        {
+          id: "verify-math151-uw",
+          status: "confirmed",
+          title: "Calculus mapping is present in the saved record",
+          conclusion: "The saved sample equivalency record explicitly maps this course to UW MATH 124.",
+          explanation: "Confirmed means the exact mapping exists in the currently saved source record. The record is still sample, unverified demo data—not live official guidance.",
+          ...buildContext("MATH& 151", "Bellevue College"),
+          destinationSchoolId: "uw",
+          destinationCourse: storedDestination("eq-math151-uw"),
+          question: "Does MATH& 151 from Bellevue College satisfy UW MATH 124 for my selected transfer major?",
+          office: "Transfer credit office",
+          sourceChecks: [{ citationId: "uw-equivalency", outcome: "supports", note: "The saved sample table contains the exact MATH& 151 to MATH 124 mapping." }],
+          canDraftEmail: false,
+        },
+        {
+          id: "verify-engl101-uw",
+          status: "likely",
+          title: "Composition category appears supported",
+          conclusion: "The saved writing policy appears to support composition credit, but it does not store an exact UW course number.",
+          explanation: "The category rule and transcript subject align. Because no direct course-to-course mapping is saved, the system does not name one.",
+          ...buildContext("ENGL& 101", "Bellevue College"),
+          destinationSchoolId: "uw",
+          question: "Will ENGL& 101 from Bellevue College satisfy the composition requirement for my selected UW transfer major?",
+          office: "Admissions",
+          sourceChecks: [{ citationId: "uw-transfer", outcome: "supports", note: "The saved policy describes composition credit, but not an exact destination course number." }],
+          canDraftEmail: true,
+        },
+        {
+          id: "verify-cs141-uw",
+          status: "manual-evaluation",
+          title: "Programming course needs department review",
+          conclusion: "No UW course equivalency is stored for CS 141. A department must evaluate it before it is used as a major prerequisite.",
+          explanation: "The equivalency guide does not resolve this course, while the major policy only identifies the prerequisite area. A syllabus-level evaluation is required.",
+          ...buildContext("CS 141", "Bellevue College"),
+          destinationSchoolId: "uw",
+          question: "Does CS 141 (Computer Science I) from Bellevue College satisfy the introductory programming prerequisite for my selected UW major, or only transfer as elective credit?",
+          office: "Department advisor",
+          sourceChecks: [
+            { citationId: "uw-equivalency", outcome: "does-not-address", note: "No exact CS 141 destination mapping is present in the saved equivalency record." },
+            { citationId: "uw-info", outcome: "does-not-address", note: "The major record describes the prerequisite but does not evaluate this source course." },
+          ],
+          canDraftEmail: true,
+        },
+      );
+    }
+
+    if (selectedSchools.has("berkeley")) {
+      items.push(
+        {
+          id: "verify-econ201-berkeley",
+          status: "unclear",
+          title: "Economics course use is not documented",
+          conclusion: "The checked sources do not provide an exact Berkeley equivalency or a major-applicability decision.",
+          explanation: "Subject similarity is not enough to establish transfer or requirement credit, so no destination course has been assigned.",
+          ...buildContext("ECON& 201", "Bellevue College"),
+          destinationSchoolId: "berkeley",
+          question: "How would ECON& 201 from Bellevue College be evaluated for transfer credit and for my selected UC Berkeley major?",
+          office: "Transfer credit office",
+          sourceChecks: [
+            { citationId: "berkeley-transfer", outcome: "does-not-address", note: "The saved transfer policy is general and does not list this course." },
+            { citationId: "berkeley-data", outcome: "does-not-address", note: "The saved major record does not identify this source course." },
+          ],
+          canDraftEmail: true,
+        },
+        {
+          id: "verify-math151-berkeley",
+          status: "conflicting",
+          title: "General transfer and major-use signals differ",
+          conclusion: "One saved record supports possible general transferability, while the major record does not confirm prerequisite use.",
+          explanation: "These records answer different questions and cannot be reconciled into a direct equivalency. No Berkeley course number has been assigned.",
+          ...buildContext("MATH& 151", "Bellevue College"),
+          destinationSchoolId: "berkeley",
+          question: "Can MATH& 151 from Bellevue College satisfy the calculus prerequisite for my selected UC Berkeley major, and if not, how will it transfer?",
+          office: "Department advisor",
+          sourceChecks: [
+            { citationId: "berkeley-transfer", outcome: "supports", note: "The general transfer record supports review for transferable quantitative credit." },
+            { citationId: "berkeley-data", outcome: "conflicts", note: "The major record does not confirm that this course satisfies the calculus prerequisite." },
+          ],
+          canDraftEmail: true,
+        },
+      );
+    }
+
+    if (selectedSchools.has("ucla")) {
+      items.push({
+        id: "verify-socw-ucla",
+        status: "manual-evaluation",
+        title: "Private-university course needs manual evaluation",
+        conclusion: "No UCLA equivalency is stored for this course.",
+        explanation: "The saved source contains no direct mapping for this institution and course. The system leaves the destination course blank.",
+        ...buildContext("SOCW 2010", "Seattle University"),
+        destinationSchoolId: "ucla",
+        question: "How will SOCW 2010 from Seattle University be evaluated for UCLA transfer credit and requirement applicability?",
+        office: "Transfer credit office",
+        sourceChecks: [{ citationId: "ucla-transfer", outcome: "does-not-address", note: "The saved transfer policy does not list this exact course." }],
+        canDraftEmail: true,
+      });
+    }
+
+    return items;
   }
 }
 
@@ -466,7 +596,7 @@ function buildAlerts(input: AcademicAnalysisInput, credits: CreditSummary, equiv
   if (uncertainProgramming) {
     alerts.push({
       id: "alert-cs-equivalency", severity: "critical", title: "Programming equivalency needs confirmation",
-      message: `${uncertainProgramming.sourceCourse} likely transfers, but its use as a direct major prerequisite is not established in the sample policy set.`,
+      message: `${uncertainProgramming.sourceCourse} has no stored destination-course mapping, so its transfer and prerequisite use require manual confirmation.`,
       confidence: "medium", office: "Department advisor", canDraftEmail: true, citationIds: uncertainProgramming.citationIds,
     });
   }
@@ -487,6 +617,7 @@ export class MockScenarioSimulator implements ScenarioSimulator {
   constructor(
     private readonly policyRetrieval: PolicyRetrievalService,
     private readonly equivalencyAnalyzer: EquivalencyAnalyzer,
+    private readonly verificationEvaluator: VerificationEvaluator,
     private readonly requirementEvaluator: RequirementEvaluator,
     private readonly prerequisiteGraph: PrerequisiteGraphService,
     private readonly recommendationEngine: CourseRecommendationEngine,
@@ -499,6 +630,7 @@ export class MockScenarioSimulator implements ScenarioSimulator {
       this.prerequisiteGraph.build(input),
     ]);
     const requirements = await this.requirementEvaluator.evaluate(input, equivalencies);
+    const verifications = await this.verificationEvaluator.evaluate(input, equivalencies);
     const recommendations = await this.recommendationEngine.recommend(input, requirements);
     const creditSummary = calculateCreditSummary(input);
     const readiness = buildReadiness(input, requirements, creditSummary);
@@ -514,6 +646,7 @@ export class MockScenarioSimulator implements ScenarioSimulator {
       prerequisiteChains,
       recommendations,
       alerts: buildAlerts(input, creditSummary, equivalencies),
+      verifications,
       citations: sampleCitations.filter((citation) => input.targets.some((target) => citation.id.startsWith(`${target.schoolId}-`))),
     };
   }
@@ -569,14 +702,24 @@ export class MockAdvisorChatService implements AdvisorChatService {
 
 // MOCK IMPLEMENTATION: email text should later include the exact retrieved policy gap and destination address.
 export class MockUncertaintyEscalationHandler implements UncertaintyEscalationHandler {
-  async draftEmail(alert: AnalysisAlert, input: AcademicAnalysisInput): Promise<DraftEmail> {
+  async draftEmail(item: VerificationItem, input: AcademicAnalysisInput): Promise<DraftEmail> {
     const selectedPrograms = targetPairs(input)
       .map(({ schoolId, majorId }) => `${getSchool(schoolId)?.shortName ?? schoolId} ${getMajor(majorId)?.name ?? majorId}`)
       .join(", ");
+    const sourceSummary = item.sourceChecks.map((check) => {
+      const citation = sampleCitations.find((candidate) => candidate.id === check.citationId);
+      return `- ${citation?.title ?? check.citationId}: ${check.note}`;
+    }).join("\n");
     return {
-      toOffice: alert.office,
-      subject: `Transfer planning question: ${alert.title}`,
-      body: `Hello,\n\nI am planning to apply as a transfer student for ${selectedPrograms}. I completed CS 141 (Computer Science I) at Bellevue College and would like to confirm whether it satisfies the introductory programming prerequisite for admission to the program, or whether it transfers only as general elective credit.\n\nI am targeting ${input.scenario.targetTransferTerm} and currently attend ${input.scenario.currentInstitution}. Could you also let me know whether a syllabus or course description is required for review?\n\nThank you for your help.`,
+      toOffice: item.office,
+      subject: `Transfer evaluation request: ${item.sourceCourse} from ${item.sourceInstitution}`,
+      body: `Hello,\n\nI am requesting guidance about ${item.sourceCourse}, taken at ${item.sourceInstitution} in ${item.sourceTerm}. I am planning for ${selectedPrograms || getSchool(item.destinationSchoolId)?.shortName || item.destinationSchoolId} and targeting ${input.scenario.targetTransferTerm}.\n\nMy exact question is:\n${item.question}\n\nThe saved sources I checked were:\n${sourceSummary}\n\nThe planning tool did not assign an equivalency that was not explicitly present in those records. Could your office confirm the result and let me know whether you need a syllabus or course description for manual evaluation?\n\nThank you for your help.`,
+      context: {
+        course: item.sourceCourse,
+        institution: item.sourceInstitution,
+        term: item.sourceTerm,
+        question: item.question,
+      },
     };
   }
 }

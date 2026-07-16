@@ -5,19 +5,20 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, BookOpen, Check, ChevronDown, Download, ExternalLink, FilePenLine,
   GitCompareArrows, GripVertical, LayoutGrid, Link2, MessageCircle, Plus, School,
-  Settings2, SlidersHorizontal, Target, X,
+  Settings2, ShieldCheck, SlidersHorizontal, Target, X,
 } from "lucide-react";
 import { useApp } from "@/components/app-provider";
 import { AdvisorPanel } from "@/components/dashboard/advisor-panel";
+import { EmailModal } from "@/components/dashboard/email-modal";
 import {
   AcademicRecordPanel, ComparisonView, CustomCoursePanel, SchoolMajorPanel,
   SettingsPanel, SimulationSummaryPanel, type SimulatorTerm,
 } from "@/components/dashboard/simulator-controls";
-import { EmptyState, ProgressBar, StateBadge } from "@/components/ui";
+import { EmptyState, ProgressBar, StateBadge, VerificationBadge } from "@/components/ui";
 import { getMajor, getSchool } from "@/data/sample-policies";
-import type { CourseRecommendation, PlanComparison, PlannedCourse } from "@/lib/types";
+import type { CourseRecommendation, PlanComparison, PlannedCourse, VerificationItem, VerificationStatus } from "@/lib/types";
 
-type PlannerTab = "plan" | "requirements" | "paths" | "compare" | "sources";
+type PlannerTab = "plan" | "requirements" | "verification" | "paths" | "compare" | "sources";
 type WidgetId = "library" | "suggestions" | "prerequisites" | "progress";
 type PlannerCourse = Pick<CourseRecommendation, "id" | "course" | "title" | "credits" | "satisfies"> & { source?: "recommended" | "custom" };
 
@@ -35,6 +36,8 @@ const widgetLabels: Record<WidgetId, { title: string; description: string }> = {
   prerequisites: { title: "Prerequisite map", description: "See what each course unlocks" },
   progress: { title: "Credit progress", description: "A short summary of your record" },
 };
+
+const verificationStatuses: VerificationStatus[] = ["confirmed", "likely", "unclear", "manual-evaluation", "conflicting"];
 
 function buildTerms(plannedCourses: PlannedCourse[], attendSummer: boolean) {
   const terms = attendSummer || plannedCourses.some((course) => course.termId === summerTerm.id) ? [...baseTerms, summerTerm] : [...baseTerms];
@@ -65,6 +68,7 @@ export function DashboardView() {
   const [recordOpen, setRecordOpen] = useState(false);
   const [customCourseOpen, setCustomCourseOpen] = useState(false);
   const [advisorOpen, setAdvisorOpen] = useState(false);
+  const [emailVerification, setEmailVerification] = useState<VerificationItem | null>(null);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [terms, setTerms] = useState<SimulatorTerm[]>(() => buildTerms(scenario.plannedCourses, scenario.attendSummer));
   const [schedule, setSchedule] = useState<Record<string, string[]>>(() => buildSchedule(buildTerms(scenario.plannedCourses, scenario.attendSummer), scenario.plannedCourses));
@@ -214,6 +218,7 @@ export function DashboardView() {
   const tabs: Array<{ id: PlannerTab; label: string; Icon: typeof LayoutGrid }> = [
     { id: "plan", label: "My plan", Icon: LayoutGrid },
     { id: "requirements", label: "Requirements", Icon: BookOpen },
+    { id: "verification", label: "Verification", Icon: ShieldCheck },
     { id: "paths", label: "Majors & paths", Icon: Target },
     { id: "compare", label: "Compare", Icon: GitCompareArrows },
     { id: "sources", label: "Sources", Icon: Link2 },
@@ -262,7 +267,53 @@ export function DashboardView() {
         <div className="mt-5 grid gap-5 lg:grid-cols-2">{widgetOrder.filter((id) => widgetVisibility[id]).map(renderWidget)}</div>
       </>}
 
-      {tab === "requirements" && <section><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">What still needs attention</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">Requirements, in plain language.</h1><p className="mt-2 text-sm text-slate-500">Completed, planned, missing, and uncertain requirements update for each selected major.</p></div><div className="mt-6 flex flex-wrap gap-2">{selectedMajorIds.map((majorId) => <button key={majorId} onClick={() => setActiveMajorId(majorId)} className={`rounded-full px-3 py-2 text-xs font-semibold ${activeRequirementMajor === majorId ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>{getMajor(majorId)?.name}</button>)}</div><div className="mt-5 grid gap-3 lg:grid-cols-2">{activeRequirements.map((requirement) => { const percent = requirement.requiredCredits ? Math.min((requirement.completedCredits / requirement.requiredCredits) * 100, 100) : 0; return <article key={requirement.id} className="card p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{requirement.category}</p><h2 className="mt-1 text-sm font-semibold text-slate-900">{requirement.title}</h2></div><StateBadge state={requirement.state} /></div><div className="mt-4"><ProgressBar value={percent} tone={requirement.state === "uncertain" ? "amber" : "teal"} /></div><p className="mt-3 text-xs text-slate-500">{requirement.missingCourses.length ? `Next: ${requirement.missingCourses.join(", ")}` : `Covered or planned: ${requirement.matchedCourses.join(", ") || "current record"}.`}</p></article>; })}</div>{analysis.alerts.some((alert) => alert.canDraftEmail) && <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4"><AlertTriangle className="mt-0.5 size-4 text-amber-600" /><div><p className="text-sm font-semibold text-amber-950">One item still needs confirmation</p><p className="mt-1 text-xs leading-5 text-amber-800">The programming equivalency is not confirmed by the sample policy dataset. Ask the advisor for the exact question to send the department.</p><button onClick={() => setAdvisorOpen(true)} className="mt-2 text-xs font-semibold text-amber-900 underline">Ask about this</button></div></div>}</section>}
+      {tab === "requirements" && <section><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">What still needs attention</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">Requirements, in plain language.</h1><p className="mt-2 text-sm text-slate-500">Completed, planned, missing, and uncertain requirements update for each selected major.</p></div><div className="mt-6 flex flex-wrap gap-2">{selectedMajorIds.map((majorId) => <button key={majorId} onClick={() => setActiveMajorId(majorId)} className={`rounded-full px-3 py-2 text-xs font-semibold ${activeRequirementMajor === majorId ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>{getMajor(majorId)?.name}</button>)}</div><div className="mt-5 grid gap-3 lg:grid-cols-2">{activeRequirements.map((requirement) => { const percent = requirement.requiredCredits ? Math.min((requirement.completedCredits / requirement.requiredCredits) * 100, 100) : 0; return <article key={requirement.id} className="card p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{requirement.category}</p><h2 className="mt-1 text-sm font-semibold text-slate-900">{requirement.title}</h2></div><StateBadge state={requirement.state} /></div><div className="mt-4"><ProgressBar value={percent} tone={requirement.state === "uncertain" ? "amber" : "teal"} /></div><p className="mt-3 text-xs text-slate-500">{requirement.missingCourses.length ? `Next: ${requirement.missingCourses.join(", ")}` : `Covered or planned: ${requirement.matchedCourses.join(", ") || "current record"}.`}</p></article>; })}</div>{analysis.verifications.some((item) => item.canDraftEmail) && <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4"><AlertTriangle className="mt-0.5 size-4 text-amber-600" /><div><p className="text-sm font-semibold text-amber-950">Some results need verification</p><p className="mt-1 text-xs leading-5 text-amber-800">See exactly what is unclear, which saved sources were checked, and which office can confirm each result.</p><button onClick={() => setTab("verification")} className="mt-2 text-xs font-semibold text-amber-900 underline">Open verification</button></div></div>}</section>}
+
+      {tab === "verification" && <section>
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+          <div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">Evidence and escalation</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">Know what is verified—and what is not.</h1><p className="mt-2 text-sm leading-6 text-slate-500">Every conclusion is limited to a saved source. When the evidence stops, Pathwise explains the gap and prepares the exact question for the right office.</p></div>
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600"><strong className="text-slate-900">No-invention rule:</strong> no destination course appears unless a saved source explicitly names it.</div>
+        </div>
+
+        <div className="mt-6 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          {verificationStatuses.map((status) => <div key={status} className="rounded-xl border border-slate-200 bg-white p-3"><VerificationBadge status={status} /><p className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">{analysis.verifications.filter((item) => item.status === status).length}</p><p className="mt-1 text-[10px] text-slate-400">result{analysis.verifications.filter((item) => item.status === status).length === 1 ? "" : "s"}</p></div>)}
+        </div>
+
+        <div className="mt-5 space-y-4">
+          {analysis.verifications.length === 0 && <EmptyState title="No course checks yet" description="Add a target school and review your transcript to generate verification records." />}
+          {analysis.verifications.map((item) => {
+            const school = getSchool(item.destinationSchoolId);
+            return <article key={item.id} data-verification-status={item.status} className="card overflow-hidden">
+              <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)] lg:p-6">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2"><VerificationBadge status={item.status} /><span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">For {school?.shortName ?? item.destinationSchoolId}</span></div>
+                  <h2 className="mt-3 text-lg font-semibold tracking-[-0.02em] text-slate-900">{item.title}</h2>
+                  <p className="mt-2 text-sm font-medium leading-6 text-slate-800">{item.conclusion}</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">{item.explanation}</p>
+                  <div className="mt-4 grid gap-2 rounded-xl bg-slate-50 p-3 text-xs sm:grid-cols-3">
+                    <div><span className="block text-[9px] font-bold uppercase tracking-wide text-slate-400">Course</span><strong className="mt-1 block text-slate-800">{item.sourceCourse}</strong></div>
+                    <div><span className="block text-[9px] font-bold uppercase tracking-wide text-slate-400">Institution</span><strong className="mt-1 block text-slate-800">{item.sourceInstitution}</strong></div>
+                    <div><span className="block text-[9px] font-bold uppercase tracking-wide text-slate-400">Term</span><strong className="mt-1 block text-slate-800">{item.sourceTerm}</strong></div>
+                    {item.destinationCourse && <div className="sm:col-span-3"><span className="block text-[9px] font-bold uppercase tracking-wide text-slate-400">Stored destination mapping</span><strong className="mt-1 block text-emerald-700">{item.destinationCourse}</strong></div>}
+                  </div>
+                  <div className="mt-4 rounded-xl border border-slate-200 px-4 py-3"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Exact question</p><p className="mt-1.5 text-xs font-medium leading-5 text-slate-700">{item.question}</p></div>
+                  {item.canDraftEmail && <button onClick={() => setEmailVerification(item)} className="primary-button mt-4">Draft email to {item.office}</button>}
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Sources checked</p>
+                  <div className="mt-3 space-y-3">{item.sourceChecks.map((check) => {
+                    const citation = analysis.citations.find((candidate) => candidate.id === check.citationId);
+                    const outcomeLabel = check.outcome === "supports" ? "Supports" : check.outcome === "conflicts" ? "Conflicts" : "Does not address";
+                    const outcomeClasses = check.outcome === "supports" ? "bg-emerald-50 text-emerald-700" : check.outcome === "conflicts" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-800";
+                    return <div key={`${item.id}-${check.citationId}`} className="rounded-xl border border-slate-200 bg-white p-3"><div className="flex items-start justify-between gap-3"><a href={citation?.url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-slate-900 underline decoration-slate-300 underline-offset-2">{citation?.title ?? check.citationId}</a><span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ${outcomeClasses}`}>{outcomeLabel}</span></div><p className="mt-2 text-[11px] leading-4 text-slate-500">{check.note}</p><p className="mt-2 text-[9px] font-semibold text-amber-700">Sample record · not verified live</p></div>;
+                  })}</div>
+                  <div className="mt-4 border-t border-slate-200 pt-4"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Contact</p><p className="mt-1 text-xs font-semibold text-slate-800">{item.office}</p></div>
+                </div>
+              </div>
+            </article>;
+          })}
+        </div>
+      </section>}
 
       {tab === "paths" && <section><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">Majors & paths</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">See how each option is shaping up.</h1><p className="mt-2 text-sm text-slate-500">Readiness shows preparation—not admission probability.</p></div><div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{analysis.readiness.map((item) => { const school = getSchool(item.schoolId); const major = getMajor(item.majorId); return <article key={item.majorId} className="card p-5"><div className="flex items-start justify-between"><div><p className="text-xs text-slate-400">{school?.shortName}</p><h2 className="mt-1 font-semibold text-slate-900">{major?.name}</h2></div><span className="text-2xl font-semibold tracking-tight text-slate-900">{item.score}</span></div><p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-teal-700">{item.status.replaceAll("-", " ")}</p><div className="mt-4"><ProgressBar value={item.score} tone={item.score >= 60 ? "teal" : "amber"} /></div><div className="mt-4 grid grid-cols-3 gap-2 text-[10px]"><div className="rounded-lg bg-slate-50 p-2"><span className="block text-slate-400">Prereqs</span><strong className="mt-1 block text-slate-700">{item.completedPrerequisites}/{item.totalPrerequisites}</strong></div><div className="rounded-lg bg-slate-50 p-2"><span className="block text-slate-400">Credits</span><strong className={`mt-1 block ${item.creditMinimumMet ? "text-emerald-700" : "text-rose-700"}`}>{item.creditMinimumMet ? "Met" : "Not yet"}</strong></div><div className="rounded-lg bg-slate-50 p-2"><span className="block text-slate-400">GPA</span><strong className={`mt-1 block ${item.gpaMinimumMet ? "text-emerald-700" : "text-rose-700"}`}>{item.gpaMinimumMet ? "Met" : "Not yet"}</strong></div></div></article>; })}</div><button onClick={() => setSchoolPanelOpen(true)} className="secondary-button mt-5"><Plus className="size-4" /> Add another school or major</button></section>}
 
@@ -277,6 +328,7 @@ export function DashboardView() {
     </div>
 
     <AdvisorPanel open={advisorOpen} onClose={() => setAdvisorOpen(false)} />
+    {emailVerification && <EmailModal item={emailVerification} onClose={() => setEmailVerification(null)} />}
     {schoolPanelOpen && <SchoolMajorPanel onClose={() => setSchoolPanelOpen(false)} />}
     {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     {recordOpen && <AcademicRecordPanel onClose={() => setRecordOpen(false)} />}

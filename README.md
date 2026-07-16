@@ -51,7 +51,12 @@ Copy `.env.example` to `.env.local` and add OpenAI/Supabase credentials when con
 8. Change current school/type, residency, enrollment term, maximum quarterly load, summer attendance, and graduation target.
 9. Watch transfer and major eligibility, missing prerequisites, general education, credits, timeline, and open options recalculate.
 10. Save multiple scenarios in the Compare tab, restore any version, or export the visible plan as a readable PDF.
-11. Ask the grounded advisor a question or review the sample source records behind the plan.
+11. Open Verification to distinguish confirmed, likely, unclear, manual-evaluation, and conflicting results; inspect every checked source and draft an exact-context email for unresolved items.
+12. Ask the grounded advisor a question or review the sample source records behind the plan.
+
+## Verification safeguards
+
+The typed verification layer stores the status, source course, institution, term, destination school, exact question, responsible office, and the outcome of each checked source. A destination course is only displayed when a saved source explicitly contains that mapping. Unresolved results never infer an equivalency; they explain the gap and can generate a reviewable email draft without sending it.
 
 ## Simulator coverage
 

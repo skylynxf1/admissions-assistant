@@ -1,5 +1,5 @@
-import { AlertTriangle, Check, Info, Sparkles } from "lucide-react";
-import type { ConfidenceLevel, RequirementState } from "@/lib/types";
+import { AlertTriangle, Check, CircleHelp, GitCompareArrows, Info, SearchCheck, Sparkles, UserRoundCheck } from "lucide-react";
+import type { ConfidenceLevel, RequirementState, VerificationStatus } from "@/lib/types";
 
 export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
@@ -36,6 +36,22 @@ export function StateBadge({ state }: { state: RequirementState }) {
   const Icon = config.icon;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${config.classes}`}>
+      <Icon className="size-3" />{config.label}
+    </span>
+  );
+}
+
+export function VerificationBadge({ status }: { status: VerificationStatus }) {
+  const config = {
+    confirmed: { label: "Confirmed", classes: "bg-emerald-50 text-emerald-700 ring-emerald-200", icon: SearchCheck },
+    likely: { label: "Likely", classes: "bg-blue-50 text-blue-700 ring-blue-200", icon: Check },
+    unclear: { label: "Unclear", classes: "bg-amber-50 text-amber-800 ring-amber-200", icon: CircleHelp },
+    "manual-evaluation": { label: "Requires manual evaluation", classes: "bg-violet-50 text-violet-700 ring-violet-200", icon: UserRoundCheck },
+    conflicting: { label: "Conflicting information", classes: "bg-rose-50 text-rose-700 ring-rose-200", icon: GitCompareArrows },
+  }[status];
+  const Icon = config.icon;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${config.classes}`}>
       <Icon className="size-3" />{config.label}
     </span>
   );
