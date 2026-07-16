@@ -42,10 +42,11 @@ Copy `.env.example` to `.env.local` and add OpenAI/Supabase credentials when con
 ## Primary demo path
 
 1. Select Transfer Planning.
-2. Complete the student profile and scenario settings.
-3. Upload a PDF for sample extraction or enter courses manually.
-4. Review and edit every extracted course field.
-5. Select multiple schools and majors.
-6. Review credits, equivalencies, requirements, prerequisite chains, and recommended courses.
-7. Change residency, source-school type, transfer term, credit load, or AP credit and see the plan update.
-8. Ask the advisor a question and draft an email for an uncertain equivalency.
+2. Complete the short student profile.
+3. Upload a PDF for sample extraction or choose manual entry, then review and edit every course field.
+4. Search for destination schools, check multiple options, and choose one priority school.
+5. Pick one or more priority-school majors and read the short requirement outline.
+6. Open the planning playground and drag recommended courses into editable quarter templates.
+7. Add more majors, adjust scenario settings, and show or hide movable workspace panels.
+8. Review plain-language requirements, prerequisite chains, and sample source records.
+9. Ask the grounded advisor a question or export the visible plan as a readable PDF.

@@ -41,10 +41,10 @@ export function AdvisorPanel({ open, onClose }: { open: boolean; onClose: () => 
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/25 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <aside className="flex h-full w-full max-w-[440px] flex-col border-l border-slate-200 bg-white shadow-2xl">
         <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div className="flex items-center gap-3"><div className="grid size-9 place-items-center rounded-xl bg-[var(--ink)] text-lime-200"><Sparkles className="size-4" /></div><div><h2 className="font-semibold text-slate-900">Pathwise advisor</h2><p className="text-xs text-slate-500">Grounded in this sample scenario</p></div></div>
+          <div className="flex items-center gap-3"><div className="grid size-9 place-items-center rounded-xl bg-[var(--ink)] text-lime-200"><Sparkles className="size-4" /></div><div><h2 className="font-semibold text-slate-900">Pathwise advisor</h2><p className="text-xs text-slate-500">Uses only saved transcript + policy data</p></div></div>
           <button onClick={onClose} aria-label="Close advisor" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="size-5" /></button>
         </header>
-        <div className="border-b border-amber-200 bg-amber-50 px-5 py-2.5 text-xs leading-5 text-amber-900">Demo answers use unverified sample policy data and are not official academic advice.</div>
+        <div className="border-b border-amber-200 bg-amber-50 px-5 py-2.5 text-xs leading-5 text-amber-900">This prototype is grounded in unverified sample records. It does not search the open web or invent missing policy details.</div>
         <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
           {advisorMessages.map((message) => (
             <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>

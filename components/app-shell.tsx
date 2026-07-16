@@ -9,8 +9,8 @@ const steps = [
   { label: "Plan type", href: "/" },
   { label: "About you", href: "/onboarding" },
   { label: "Transcript", href: "/transcript" },
-  { label: "Targets", href: "/targets" },
-  { label: "Plan", href: "/dashboard" },
+  { label: "Schools", href: "/targets" },
+  { label: "Priority", href: "/program" },
 ];
 
 export function FlowShell({ children }: { children: React.ReactNode }) {
@@ -31,7 +31,7 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      {pathname !== "/" && (
+      {pathname !== "/" && pathname !== "/dashboard" && (
         <div className="border-b border-slate-200 bg-white">
           <nav className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3" aria-label="Planning progress">
             {steps.slice(1).map((step, index) => {

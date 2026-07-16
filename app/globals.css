@@ -60,3 +60,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 768px) {
   .desktop-table { display: block; overflow-x: auto; }
 }
+
+@media print {
+  header, nav, .print-hide, button { display: none !important; }
+  body { background: white !important; color: #111827 !important; }
+  main { max-width: none !important; padding: 0 !important; }
+  .card { break-inside: avoid; box-shadow: none !important; border-color: #d1d5db !important; }
+}
