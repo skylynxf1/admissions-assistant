@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: academic_ingest
+      POSTGRES_USER: academic_ingest
+      POSTGRES_PASSWORD: academic_ingest_local
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U academic_ingest -d academic_ingest"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - academic_ingest_postgres:/var/lib/postgresql/data
+
+volumes:
+  academic_ingest_postgres:
