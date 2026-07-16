@@ -89,8 +89,9 @@ class Settings(BaseSettings):
         return self
 
 
-def load_institution_config(path: Path) -> InstitutionConfig:
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+def load_institution_config(path: Path | str) -> InstitutionConfig:
+    config_path = Path(path)
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
-        raise ValueError(f"institution configuration must be a mapping: {path}")
+        raise ValueError(f"institution configuration must be a mapping: {config_path}")
     return InstitutionConfig.model_validate(raw)
