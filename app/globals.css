@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #102a2a;
+  --teal: #0f766e;
+  --lime: #b8ef70;
+  --canvas: #f5f7f4;
+  --line: #dfe5df;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: #172126;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, Helvetica, sans-serif;
+}
+button, input, select, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+::selection { background: #c9f7ea; color: var(--ink); }
+
+.card {
+  border: 1px solid rgb(226 232 240 / 0.9);
+  background: rgb(255 255 255 / 0.94);
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.03), 0 10px 30px rgb(15 23 42 / 0.025);
+}
+
+.field {
+  width: 100%;
+  border: 1px solid #d7dedb;
+  border-radius: 0.75rem;
+  background: white;
+  padding: 0.72rem 0.85rem;
+  color: #172126;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.field:focus { border-color: #0f766e; box-shadow: 0 0 0 3px rgb(15 118 110 / 0.12); }
+.field-label { display: block; margin-bottom: 0.42rem; font-size: 0.75rem; font-weight: 650; color: #475569; }
+
+.primary-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: 2.75rem; border-radius: 0.75rem; background: var(--ink); padding: 0.7rem 1.1rem;
+  font-size: 0.875rem; font-weight: 650; color: white; transition: transform 150ms ease, background 150ms ease;
+}
+.primary-button:hover { background: #183b3a; transform: translateY(-1px); }
+.primary-button:disabled { cursor: not-allowed; opacity: 0.55; transform: none; }
+.secondary-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  min-height: 2.75rem; border: 1px solid #d7dedb; border-radius: 0.75rem; background: white; padding: 0.7rem 1.1rem;
+  font-size: 0.875rem; font-weight: 650; color: #334155; transition: background 150ms ease, border-color 150ms ease;
+}
+.secondary-button:hover { border-color: #b8c6c0; background: #f8faf9; }
+
+@keyframes pulse-soft { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+.skeleton { animation: pulse-soft 1.7s ease-in-out infinite; background: #e8eeeb; border-radius: .5rem; }
+
+@media (max-width: 768px) {
+  .desktop-table { display: block; overflow-x: auto; }
+}
