@@ -49,7 +49,7 @@ def _footnote_for(tree: HTMLParser, table: Node) -> str | None:
             return clean_text(node)
     ancestor = table.parent
     if ancestor is not None:
-        note = ancestor.css_first(".footnote, .table-note")
+        note = ancestor.css_first(".footnote, .table-note, .subject-note")
         if note is not None:
             return clean_text(note)
     return None
@@ -67,8 +67,33 @@ def extract_table_rows(tree: HTMLParser) -> list[TableRowContext]:
         heading = _heading_for(table)
         footnote = _footnote_for(tree, table)
         data_rows = table.css("tbody tr") or [row for row in table.css("tr") if row.css("td")]
+        pending_rowspans: dict[int, tuple[str, int]] = {}
         for row_index, row in enumerate(data_rows, start=1):
-            cells = [clean_text(node) for node in row.css("th, td")]
+            values_by_column: dict[int, str] = {}
+            for column, (value, remaining) in list(pending_rowspans.items()):
+                values_by_column[column] = value
+                if remaining <= 1:
+                    del pending_rowspans[column]
+                else:
+                    pending_rowspans[column] = (value, remaining - 1)
+            column = 0
+            for cell in row.css("th, td"):
+                while column in values_by_column:
+                    column += 1
+                value = clean_text(cell)
+                try:
+                    colspan = max(1, int(cell.attributes.get("colspan") or "1"))
+                    rowspan = max(1, int(cell.attributes.get("rowspan") or "1"))
+                except ValueError:
+                    colspan, rowspan = 1, 1
+                for offset in range(colspan):
+                    target_column = column + offset
+                    values_by_column[target_column] = value
+                    if rowspan > 1:
+                        pending_rowspans[target_column] = (value, rowspan - 1)
+                column += colspan
+            width = max(len(headers), max(values_by_column, default=-1) + 1)
+            cells = [values_by_column.get(index, "") for index in range(width)]
             if not cells:
                 continue
             contexts.append(
