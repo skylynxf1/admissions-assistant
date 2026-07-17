@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 from typing import Any
 from uuid import UUID
@@ -15,6 +17,7 @@ from academic_ingest.db.models import (
     SourceChangeEventModel,
     SourcePageModel,
     SourceSnapshotModel,
+    utc_now,
 )
 from academic_ingest.models.domain import SourcePage
 
@@ -49,8 +52,14 @@ def compute_changed_blocks(previous: bytes, current: bytes) -> list[ChangedBlock
 
 
 class SourceRepository:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        clock: Callable[[], datetime] = utc_now,
+    ) -> None:
         self.session = session
+        self.clock = clock
 
     async def upsert_page(self, page: SourcePage) -> SourcePageModel:
         existing = await self.session.scalar(
@@ -109,13 +118,17 @@ class SourceRepository:
         previous = await self.session.scalar(
             select(SourceSnapshotModel)
             .where(SourceSnapshotModel.source_page_id == source_page_id)
-            .order_by(SourceSnapshotModel.retrieved_at.desc())
+            .order_by(SourceSnapshotModel.retrieved_at.desc(), SourceSnapshotModel.id.desc())
             .limit(1)
         )
+        retrieved_at = self.clock()
+        if previous is not None and retrieved_at <= previous.retrieved_at:
+            retrieved_at = previous.retrieved_at + timedelta(microseconds=1)
         crawl_uuid = UUID(crawl_job_id) if isinstance(crawl_job_id, str) else crawl_job_id
         snapshot = SourceSnapshotModel(
             source_page_id=source_page_id,
             crawl_job_id=crawl_uuid,
+            retrieved_at=retrieved_at,
             raw_content_location=raw_content_location or f"memory://sha256/{raw_hash}",
             raw_content_hash=raw_hash,
             normalized_content_hash=_normalized_hash(raw_content),

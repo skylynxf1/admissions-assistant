@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy import func, select
@@ -78,6 +79,20 @@ async def test_changed_snapshot_preserves_previous_version(db_session: AsyncSess
         first.raw_content_hash,
         second.raw_content_hash,
     ]
+
+
+async def test_snapshot_history_is_monotonic_when_clock_resolution_ties(
+    db_session: AsyncSession,
+) -> None:
+    _, page, crawl_id = await seed_source_page(db_session)
+    fixed_time = datetime(2026, 7, 16, 12, tzinfo=UTC)
+    repository = SourceRepository(db_session, clock=lambda: fixed_time)
+
+    first = await repository.create_snapshot(page.id, b"first", crawl_id)
+    second = await repository.create_snapshot(page.id, b"second", crawl_id)
+
+    assert first.retrieved_at == fixed_time
+    assert second.retrieved_at == fixed_time + timedelta(microseconds=1)
 
 
 async def test_snapshot_accepts_durable_content_location(db_session: AsyncSession) -> None:
