@@ -1,0 +1,51 @@
+institution_id: uw-seattle
+legal_name: University of Washington
+common_name: University of Washington
+campus: Seattle
+state: Washington
+country: US
+calendar_system: quarter
+
+allowed_domains:
+  - washington.edu
+  - www.washington.edu
+  - admit.washington.edu
+
+disallowed_campus_patterns:
+  - bothell
+  - tacoma
+  - uwb.edu
+  - tacoma.uw.edu
+
+seed_urls:
+  - https://www.washington.edu/students/crscat/
+  - https://www.washington.edu/students/crscat/glossary.html
+  - https://www.washington.edu/students/timeschd/
+  - https://admit.washington.edu/apply/transfer/
+  - https://admit.washington.edu/apply/transfer/how-to-apply/
+  - https://admit.washington.edu/apply/transfer/policies/
+  - https://admit.washington.edu/apply/admission-to-majors/
+  - https://admit.washington.edu/academics/majors/
+  - https://admit.washington.edu/apply/transfer/exams-for-credit/ap/
+  - https://admit.washington.edu/apply/first-year/exams-for-credit/
+  - https://admit.washington.edu/apply/whats-my-application-type/
+
+enabled_policy_families:
+  - course
+  - program
+  - major_admission
+  - admissions
+  - transfer_policy
+  - exam_credit
+  - general_education
+  - course_offering
+
+request_policy:
+  user_agent: "AcademicPlanningOS/0.1 (+{contact_email})"
+  requests_per_second: 0.5
+  max_concurrency: 2
+  timeout_seconds: 30
+  retries: 2
+  exponential_backoff: true
+  respect_robots_txt: true
+  max_response_bytes: 10485760

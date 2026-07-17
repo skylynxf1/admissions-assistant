@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
-
 from app.main import create_app
 from app.models import ConditionType, GroupType, PrerequisiteCondition, PrerequisiteGroup
 from app.repository import InMemoryRecommendationRepository
 from app.sample_data import SCENARIO_ID
+from fastapi.testclient import TestClient
 
 
 def client_for(dataset):
@@ -54,12 +53,14 @@ def test_recommendation_endpoint_rejects_prerequisite_cycle(dataset):
             id="cycle-a",
             target_course_id="calc1",
             group_type=GroupType.ALL,
-            conditions=[PrerequisiteCondition(
-                id="cycle-a-condition",
-                prerequisite_group_id="cycle-a",
-                condition_type=ConditionType.COURSE,
-                prerequisite_course_id="calc2",
-            )],
+            conditions=[
+                PrerequisiteCondition(
+                    id="cycle-a-condition",
+                    prerequisite_group_id="cycle-a",
+                    condition_type=ConditionType.COURSE,
+                    prerequisite_course_id="calc2",
+                )
+            ],
         )
     )
     with client_for(dataset) as client:

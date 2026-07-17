@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -28,5 +28,7 @@ class ParsedDocument(BaseModel):
 
 
 class ParserFailure(BaseModel):
-    code: Literal["protected_pdf", "corrupt_pdf", "empty_pdf", "parser_unavailable", "parser_failed"]
+    code: Literal[
+        "protected_pdf", "corrupt_pdf", "empty_pdf", "parser_unavailable", "parser_failed"
+    ]
     detail: str

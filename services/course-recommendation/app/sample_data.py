@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from app.models import (
-    Confidence,
     ConditionType,
+    Confidence,
     Course,
     CourseEquivalency,
     CourseOffering,
@@ -22,7 +22,6 @@ from app.models import (
     StudentCourse,
     StudentCourseStatus,
 )
-
 
 SCENARIO_ID = "90000000-0000-0000-0000-000000000001"
 BC = "10000000-0000-0000-0000-000000000004"
@@ -104,9 +103,27 @@ def sample_dataset() -> ScenarioDataset:
         ),
     ]
     programs = [
-        Program(id="program-cs", institution_id=UW, name="Computer Science", degree_type="BS", program_type="major"),
-        Program(id="program-info", institution_id=UW, name="Informatics", degree_type="BS", program_type="major"),
-        Program(id="program-data", institution_id=BERKELEY, name="Data Science", degree_type="BA", program_type="major"),
+        Program(
+            id="program-cs",
+            institution_id=UW,
+            name="Computer Science",
+            degree_type="BS",
+            program_type="major",
+        ),
+        Program(
+            id="program-info",
+            institution_id=UW,
+            name="Informatics",
+            degree_type="BS",
+            program_type="major",
+        ),
+        Program(
+            id="program-data",
+            institution_id=BERKELEY,
+            name="Data Science",
+            degree_type="BA",
+            program_type="major",
+        ),
     ]
     requirements = [
         _requirement("req-cs-calc", "program-cs", "Calculus II"),
@@ -195,7 +212,8 @@ def sample_dataset() -> ScenarioDataset:
         student_courses=student_courses,
         academic_data_version="fictional-sample-v1",
         data_warnings=[
-            "Sample data only: course rules, offerings, and equivalencies are fictional and are not verified official information."
+            "Sample data only: course rules, offerings, and equivalencies are fictional "
+            "and are not verified official information."
         ],
     )
 

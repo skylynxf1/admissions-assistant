@@ -77,7 +77,7 @@ class PrerequisiteGraph:
         for cycle in nx.simple_cycles(self.graph):
             rotations = [cycle[index:] + cycle[:index] for index in range(len(cycle))]
             normalized = min(rotations)
-            canonical.append(normalized + [normalized[0]])
+            canonical.append([*normalized, normalized[0]])
         return sorted(canonical, key=lambda value: tuple(value))
 
     def has_path(self, source_course_id: str, target_course_id: str) -> bool:
@@ -113,7 +113,10 @@ def build_prerequisite_graph(
 
     for group in prerequisite_groups:
         for condition in group.conditions:
-            if condition.condition_type != ConditionType.COURSE or not condition.prerequisite_course_id:
+            if (
+                condition.condition_type != ConditionType.COURSE
+                or not condition.prerequisite_course_id
+            ):
                 continue
             if condition.prerequisite_course_id not in graph or group.target_course_id not in graph:
                 continue
@@ -139,15 +142,21 @@ def get_direct_prerequisites(graph: PrerequisiteGraph, course_id: str) -> list[G
     return graph.get_direct_prerequisites(course_id)
 
 
-def get_all_prerequisite_ancestors(graph: PrerequisiteGraph, course_id: str) -> list[GraphCourseResult]:
+def get_all_prerequisite_ancestors(
+    graph: PrerequisiteGraph, course_id: str
+) -> list[GraphCourseResult]:
     return graph.get_all_prerequisite_ancestors(course_id)
 
 
-def get_directly_unlocked_courses(graph: PrerequisiteGraph, course_id: str) -> list[GraphCourseResult]:
+def get_directly_unlocked_courses(
+    graph: PrerequisiteGraph, course_id: str
+) -> list[GraphCourseResult]:
     return graph.get_directly_unlocked_courses(course_id)
 
 
-def get_all_unlocked_descendants(graph: PrerequisiteGraph, course_id: str) -> list[GraphCourseResult]:
+def get_all_unlocked_descendants(
+    graph: PrerequisiteGraph, course_id: str
+) -> list[GraphCourseResult]:
     return graph.get_all_unlocked_descendants(course_id)
 
 
@@ -155,7 +164,9 @@ def get_dependency_depth(graph: PrerequisiteGraph, course_id: str) -> int:
     return graph.get_dependency_depth(course_id)
 
 
-def get_critical_prerequisite_chain(graph: PrerequisiteGraph, course_id: str) -> list[GraphCourseResult]:
+def get_critical_prerequisite_chain(
+    graph: PrerequisiteGraph, course_id: str
+) -> list[GraphCourseResult]:
     return graph.get_critical_prerequisite_chain(course_id)
 
 

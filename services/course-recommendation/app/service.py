@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import defaultdict
-from math import isclose
 
 import networkx as nx
 
@@ -19,12 +18,10 @@ from app.models import (
     CourseRecommendationFeatures,
     EquivalencyType,
     ExcludedCourse,
-    GeneralEducationMapping,
     OfferingStatus,
     RecommendationExplanationContext,
     RecommendationRequest,
     RecommendationResponse,
-    RequirementCourseOption,
     ScenarioDataset,
     StudentCourseStatus,
 )
@@ -36,7 +33,6 @@ from app.scoring import (
     risk_level,
     usefulness_label,
 )
-
 
 ACCEPTED_EQUIVALENCIES = {
     EquivalencyType.DIRECT,
@@ -56,7 +52,9 @@ class RecommendationService:
         self.repository = repository
         self.scorer = WeightedRecommendationScorer()
 
-    async def recommend(self, scenario_id: str, request: RecommendationRequest) -> RecommendationResponse:
+    async def recommend(
+        self, scenario_id: str, request: RecommendationRequest
+    ) -> RecommendationResponse:
         dataset = await self.repository.load_dataset(scenario_id)
         fingerprint = scenario_fingerprint(dataset, request)
         cached = await self.repository.get_cached(scenario_id, request.target_term, fingerprint)
@@ -65,7 +63,9 @@ class RecommendationService:
                 update={"recommendations": cached.recommendations[: request.max_results]}, deep=True
             )
 
-        graph = build_prerequisite_graph(dataset.courses, dataset.prerequisite_groups, dataset.offerings)
+        graph = build_prerequisite_graph(
+            dataset.courses, dataset.prerequisite_groups, dataset.offerings
+        )
         candidates, excluded = self.generate_candidate_courses(
             dataset, graph, request.target_term, request.include_uncertain
         )
@@ -98,7 +98,8 @@ class RecommendationService:
             dataset.academic_data_version,
         )
         return full_response.model_copy(
-            update={"recommendations": full_response.recommendations[: request.max_results]}, deep=True
+            update={"recommendations": full_response.recommendations[: request.max_results]},
+            deep=True,
         )
 
     def generate_candidate_courses(
@@ -119,7 +120,8 @@ class RecommendationService:
         ]
         completed_ids = {item.course_id for item in completed}
         in_progress_ids = {
-            item.course_id for item in dataset.student_courses
+            item.course_id
+            for item in dataset.student_courses
             if item.status == StudentCourseStatus.IN_PROGRESS and item.course_id
         }
         evaluator = PrerequisiteEligibilityEvaluator(dataset.prerequisite_groups)
@@ -137,24 +139,36 @@ class RecommendationService:
                 dataset.placement_results,
                 dataset.admitted_program_ids,
             )
-            if not course.active or course.institution_id != dataset.scenario.current_institution_id:
+            if (
+                not course.active
+                or course.institution_id != dataset.scenario.current_institution_id
+            ):
                 continue
             if course.id in completed_ids:
                 reason = "Course is already completed."
             elif not self._offered_in_term(offerings.get(course.id, []), target_term):
                 reason = f"No confirmed or typical offering for {target_term}."
             elif not (eligibility.eligible or eligibility.eligible_with_concurrent_enrollment):
-                missing = [self._course_code(dataset, value) for value in eligibility.missing_courses]
+                missing = [
+                    self._course_code(dataset, value) for value in eligibility.missing_courses
+                ]
                 reason = (
                     "Missing prerequisite " + ", ".join(missing) + "."
-                    if missing else "Prerequisite conditions are not satisfied."
+                    if missing
+                    else "Prerequisite conditions are not satisfied."
                 )
-            elif dataset.scenario.max_credits is not None and course.credits > dataset.scenario.max_credits:
+            elif (
+                dataset.scenario.max_credits is not None
+                and course.credits > dataset.scenario.max_credits
+            ):
                 reason = "Course exceeds the scenario maximum credits."
             else:
                 relevant = self._is_relevant(course.id, dataset, graph, required_course_ids)
                 if not relevant:
-                    reason = "Course does not apply to a selected program, general education, or prerequisite chain."
+                    reason = (
+                        "Course does not apply to a selected program, general education, "
+                        "or prerequisite chain."
+                    )
                 elif self._duplicate_credit_risk(course.id, dataset, completed_ids):
                     reason = "Course may duplicate credit already completed."
                 else:
@@ -162,9 +176,17 @@ class RecommendationService:
                     if uncertain and not include_uncertain:
                         reason = "Applicability is uncertain and include_uncertain is false."
                     else:
-                        candidates.append(CandidateCourse(course=course, eligibility=eligibility, uncertain=uncertain))
+                        candidates.append(
+                            CandidateCourse(
+                                course=course, eligibility=eligibility, uncertain=uncertain
+                            )
+                        )
             if reason:
-                excluded.append(ExcludedCourse(course_id=course.id, course_code=course.course_code, reason=reason))
+                excluded.append(
+                    ExcludedCourse(
+                        course_id=course.id, course_code=course.course_code, reason=reason
+                    )
+                )
         return candidates, excluded
 
     def _recommendation(
@@ -226,9 +248,12 @@ class RecommendationService:
         selected_program_ids = {item.program_id for item in dataset.scenario.selected_programs}
 
         for required_course_id, entries in requirement_by_course.items():
-            applies = course.id == required_course_id or graph.has_path(course.id, required_course_id)
+            applies = course.id == required_course_id or graph.has_path(
+                course.id, required_course_id
+            )
             matching_equivalencies = [
-                item for item in dataset.equivalencies
+                item
+                for item in dataset.equivalencies
                 if item.source_course_id == course.id
                 and item.target_course_id == required_course_id
                 and item.equivalency_type == EquivalencyType.DIRECT
@@ -248,7 +273,8 @@ class RecommendationService:
                 source_ids.update(equivalency.source_ids)
 
         ge_mappings = [
-            item for item in dataset.general_education_mappings
+            item
+            for item in dataset.general_education_mappings
             if item.course_id == course.id
             and item.status in {"CONFIRMED", "LIKELY"}
             and item.confidence != Confidence.UNKNOWN
@@ -263,7 +289,8 @@ class RecommendationService:
         coverage = self._university_coverage(course.id, dataset, helped_programs)
         helped_institutions = sorted(key for key, values in coverage.items() if values)
         relevant_equivalencies = [
-            item for item in dataset.equivalencies
+            item
+            for item in dataset.equivalencies
             if item.source_course_id == course.id
             and item.target_institution_id in dataset.scenario.selected_institution_ids
         ]
@@ -286,7 +313,8 @@ class RecommendationService:
             if infrequent and depth_reduction >= 3:
                 terms_saved = 2
         completed_ids = {
-            item.course_id for item in dataset.student_courses
+            item.course_id
+            for item in dataset.student_courses
             if item.status == StudentCourseStatus.COMPLETED and item.course_id
         }
         duplicate_risk = self._duplicate_credit_risk(course.id, dataset, completed_ids)
@@ -325,7 +353,8 @@ class RecommendationService:
     ) -> tuple[set[str], dict[str, list[tuple[str, str, int, list[str]]]]]:
         selected = {item.program_id: item.priority for item in dataset.scenario.selected_programs}
         requirements = {
-            item.id: item for item in dataset.program_requirements
+            item.id: item
+            for item in dataset.program_requirements
             if item.program_id in selected and item.required
         }
         mapping: dict[str, list[tuple[str, str, int, list[str]]]] = defaultdict(list)
@@ -347,9 +376,7 @@ class RecommendationService:
                 and equivalency.confidence != Confidence.UNKNOWN
                 and equivalency.target_course_id in mapping
             ):
-                mapping[equivalency.source_course_id].extend(
-                    mapping[equivalency.target_course_id]
-                )
+                mapping[equivalency.source_course_id].extend(mapping[equivalency.target_course_id])
         return set(mapping), mapping
 
     @staticmethod
@@ -376,7 +403,10 @@ class RecommendationService:
             for item in offerings
             if item.offering_status in {OfferingStatus.CONFIRMED, OfferingStatus.TYPICALLY_OFFERED}
         }
-        return bool(offered_seasons) and len(offered_seasons & {"autumn", "fall", "winter", "spring"}) < 3
+        return (
+            bool(offered_seasons)
+            and len(offered_seasons & {"autumn", "fall", "winter", "spring"}) < 3
+        )
 
     def _is_relevant(
         self,
@@ -389,7 +419,10 @@ class RecommendationService:
             return True
         if any(graph.has_path(course_id, target) for target in required_course_ids):
             return True
-        if any(item.course_id == course_id and item.status in {"CONFIRMED", "LIKELY"} for item in dataset.general_education_mappings):
+        if any(
+            item.course_id == course_id and item.status in {"CONFIRMED", "LIKELY"}
+            for item in dataset.general_education_mappings
+        ):
             return True
         return any(
             item.source_course_id == course_id
@@ -405,7 +438,8 @@ class RecommendationService:
         if course_id in completed_ids:
             return True
         candidate_targets = {
-            item.target_course_id for item in dataset.equivalencies
+            item.target_course_id
+            for item in dataset.equivalencies
             if item.source_course_id == course_id
             and item.equivalency_type == EquivalencyType.DIRECT
             and item.target_course_id
@@ -431,10 +465,15 @@ class RecommendationService:
     @staticmethod
     def _best_confidence(equivalencies: list[CourseEquivalency]) -> Confidence:
         accepted = [
-            item.confidence for item in equivalencies
+            item.confidence
+            for item in equivalencies
             if item.equivalency_type in ACCEPTED_EQUIVALENCIES
         ]
-        return max(accepted, key=lambda value: CONFIDENCE_RANK[value]) if accepted else Confidence.UNKNOWN
+        return (
+            max(accepted, key=lambda value: CONFIDENCE_RANK[value])
+            if accepted
+            else Confidence.UNKNOWN
+        )
 
     @staticmethod
     def _university_coverage(
@@ -459,13 +498,25 @@ class RecommendationService:
             ):
                 outcomes[mapping.institution_id].add("GENERAL_EDUCATION")
         for equivalency in dataset.equivalencies:
-            if equivalency.source_course_id != course_id or equivalency.target_institution_id not in outcomes:
+            if (
+                equivalency.source_course_id != course_id
+                or equivalency.target_institution_id not in outcomes
+            ):
                 continue
-            if equivalency.equivalency_type == EquivalencyType.DIRECT and equivalency.confidence != Confidence.UNKNOWN:
+            if (
+                equivalency.equivalency_type == EquivalencyType.DIRECT
+                and equivalency.confidence != Confidence.UNKNOWN
+            ):
                 outcomes[equivalency.target_institution_id].add("DIRECT_EQUIVALENT")
-            elif equivalency.equivalency_type == EquivalencyType.DEPARTMENTAL_ELECTIVE and equivalency.confidence != Confidence.UNKNOWN:
+            elif (
+                equivalency.equivalency_type == EquivalencyType.DEPARTMENTAL_ELECTIVE
+                and equivalency.confidence != Confidence.UNKNOWN
+            ):
                 outcomes[equivalency.target_institution_id].add("DEPARTMENTAL_ELECTIVE")
-            elif equivalency.equivalency_type == EquivalencyType.GENERAL_ELECTIVE and equivalency.confidence != Confidence.UNKNOWN:
+            elif (
+                equivalency.equivalency_type == EquivalencyType.GENERAL_ELECTIVE
+                and equivalency.confidence != Confidence.UNKNOWN
+            ):
                 outcomes[equivalency.target_institution_id].add("TRANSFERABLE_ELECTIVE")
         return {key: sorted(values) for key, values in sorted(outcomes.items())}
 
@@ -516,17 +567,23 @@ class RecommendationService:
         if direct_count:
             risk -= 0.1
             factors.append("has a direct equivalency")
-        elif equivalencies and all(item.equivalency_type == EquivalencyType.GENERAL_ELECTIVE for item in equivalencies):
+        elif equivalencies and all(
+            item.equivalency_type == EquivalencyType.GENERAL_ELECTIVE for item in equivalencies
+        ):
             risk += 0.1
             factors.append("transfers only as general elective credit")
-        if equivalencies and all(item.confidence in {Confidence.LOW, Confidence.UNKNOWN} for item in equivalencies):
+        if equivalencies and all(
+            item.confidence in {Confidence.LOW, Confidence.UNKNOWN} for item in equivalencies
+        ):
             risk += 0.2
             factors.append("applicability evidence is uncertain")
         return round(max(0.0, min(1.0, risk)), 3), factors
 
     @staticmethod
     def _course_code(dataset: ScenarioDataset, course_id: str) -> str:
-        return next((item.course_code for item in dataset.courses if item.id == course_id), course_id)
+        return next(
+            (item.course_code for item in dataset.courses if item.id == course_id), course_id
+        )
 
     @staticmethod
     def explanation_context(
@@ -538,7 +595,9 @@ class RecommendationService:
         return RecommendationExplanationContext(
             student_goal_summary=dataset.scenario.name or "Multi-program academic plan",
             recommendation=recommendation,
-            selected_program_names=sorted(item.name for item in dataset.programs if item.id in selected_ids),
+            selected_program_names=sorted(
+                item.name for item in dataset.programs if item.id in selected_ids
+            ),
             selected_institution_names=dataset.scenario.selected_institution_ids,
             verified_source_summaries=verified_source_summaries,
         )
@@ -586,7 +645,9 @@ async def generate_candidate_courses(
     include_uncertain: bool = False,
 ) -> list[CandidateCourse]:
     dataset = await repository.load_dataset(scenario_id)
-    graph = build_prerequisite_graph(dataset.courses, dataset.prerequisite_groups, dataset.offerings)
+    graph = build_prerequisite_graph(
+        dataset.courses, dataset.prerequisite_groups, dataset.offerings
+    )
     candidates, _ = RecommendationService(repository).generate_candidate_courses(
         dataset, graph, target_term, include_uncertain
     )

@@ -9,7 +9,12 @@ out/
 .DS_Store
 supabase/.branches/
 supabase/.temp/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 .venv/
 __pycache__/
-.pytest_cache/
-*.pyc
+*.egg-info/
+tmp/
+var/

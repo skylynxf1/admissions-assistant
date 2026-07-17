@@ -12,7 +12,6 @@ from app.models import (
     PrerequisiteGroup,
 )
 
-
 CONFIDENCE_ORDER = {
     Confidence.HIGH: 3,
     Confidence.MEDIUM: 2,
@@ -81,12 +80,16 @@ class PrerequisiteEligibilityEvaluator:
             confidences.extend(condition.confidence for condition in group.conditions)
             satisfied_count = sum(result.satisfied for result in condition_results)
             if group.group_type == GroupType.ALL:
-                group_satisfied = bool(condition_results) and satisfied_count == len(condition_results)
+                group_satisfied = bool(condition_results) and satisfied_count == len(
+                    condition_results
+                )
             elif group.group_type == GroupType.ANY:
                 group_satisfied = satisfied_count >= 1
             else:
                 group_satisfied = satisfied_count >= (group.minimum_conditions or 1)
-            group_uses_concurrency = group_satisfied and any(result.concurrent for result in condition_results if result.satisfied)
+            group_uses_concurrency = group_satisfied and any(
+                result.concurrent for result in condition_results if result.satisfied
+            )
 
             if group_satisfied:
                 satisfied_groups.append(group.id)
@@ -102,8 +105,14 @@ class PrerequisiteEligibilityEvaluator:
                 required_group_results.append((group_satisfied, group_uses_concurrency))
 
         all_required_satisfied = all(result[0] for result in required_group_results)
-        needs_concurrency = all_required_satisfied and any(result[1] for result in required_group_results)
-        confidence = min(confidences, key=lambda value: CONFIDENCE_ORDER[value]) if confidences else Confidence.HIGH
+        needs_concurrency = all_required_satisfied and any(
+            result[1] for result in required_group_results
+        )
+        confidence = (
+            min(confidences, key=lambda value: CONFIDENCE_ORDER[value])
+            if confidences
+            else Confidence.HIGH
+        )
         return CourseEligibilityResult(
             eligible=all_required_satisfied and not needs_concurrency,
             eligible_with_concurrent_enrollment=needs_concurrency,
@@ -129,9 +138,10 @@ class PrerequisiteEligibilityEvaluator:
         if condition.condition_type == ConditionType.COURSE and condition.prerequisite_course_id:
             completed_course = completed.get(condition.prerequisite_course_id)
             if completed_course:
-                if condition.minimum_grade_points is None:
-                    result.satisfied = True
-                elif completed_course.grade_points is not None and completed_course.grade_points >= condition.minimum_grade_points:
+                if condition.minimum_grade_points is None or (
+                    completed_course.grade_points is not None
+                    and completed_course.grade_points >= condition.minimum_grade_points
+                ):
                     result.satisfied = True
                 else:
                     result.minimum_grade_failures.append(condition.prerequisite_course_id)
@@ -144,11 +154,14 @@ class PrerequisiteEligibilityEvaluator:
 
         if condition.condition_type == ConditionType.PLACEMENT and condition.placement_test_code:
             score = placement_results.get(condition.placement_test_code)
-            result.satisfied = score is not None and score >= float(condition.minimum_placement_score or 0)
+            result.satisfied = score is not None and score >= float(
+                condition.minimum_placement_score or 0
+            )
             if not result.satisfied:
                 minimum = condition.minimum_placement_score
+                minimum_label = f" >= {minimum:g}" if minimum is not None else ""
                 result.placement_alternatives.append(
-                    f"{condition.placement_test_code}{f' >= {minimum:g}' if minimum is not None else ''}"
+                    f"{condition.placement_test_code}{minimum_label}"
                 )
             return result
 
@@ -156,18 +169,27 @@ class PrerequisiteEligibilityEvaluator:
             result.satisfied = completed_credits >= float(condition.minimum_credits or 0)
             return result
 
-        if condition.condition_type == ConditionType.PROGRAM_ADMISSION and condition.admitted_program_id:
+        if (
+            condition.condition_type == ConditionType.PROGRAM_ADMISSION
+            and condition.admitted_program_id
+        ):
             result.satisfied = condition.admitted_program_id in admitted_programs
             if not result.satisfied:
-                result.permission_requirements.append(f"Admission to program {condition.admitted_program_id}")
+                result.permission_requirements.append(
+                    f"Admission to program {condition.admitted_program_id}"
+                )
             return result
 
         if condition.condition_type == ConditionType.INSTRUCTOR_PERMISSION:
-            result.permission_requirements.append(condition.raw_requirement_text or "Instructor permission required")
+            result.permission_requirements.append(
+                condition.raw_requirement_text or "Instructor permission required"
+            )
             return result
 
         # OTHER and malformed conditions are never treated as satisfied.
-        result.permission_requirements.append(condition.raw_requirement_text or "Unresolved prerequisite condition")
+        result.permission_requirements.append(
+            condition.raw_requirement_text or "Unresolved prerequisite condition"
+        )
         return result
 
 

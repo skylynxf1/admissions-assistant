@@ -41,7 +41,11 @@ def create_app(repository: RecommendationRepository | None = None) -> FastAPI:
 
     @api.get("/health")
     async def health(request: Request) -> dict[str, str]:
-        mode = "supabase" if isinstance(request.app.state.repository, SupabaseRecommendationRepository) else "sample"
+        mode = (
+            "supabase"
+            if isinstance(request.app.state.repository, SupabaseRecommendationRepository)
+            else "sample"
+        )
         return {"status": "ok", "mode": mode}
 
     @api.post(

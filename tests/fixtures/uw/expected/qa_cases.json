@@ -1,0 +1,14 @@
+[
+  {"id": "direct-equivalency-major-unknown", "scenario": "Direct course equivalency with no source claim about major applicability", "expected_disposition": "publish_with_unknown_major_applicability", "required_assertions": ["direct equivalency preserved", "major applicability is unknown"]},
+  {"id": "many-to-one-transfer-mapping", "scenario": "Multiple sending courses map to one UW course", "expected_disposition": "publish_grouped_mapping", "required_assertions": ["all sending courses retained", "mapping cardinality retained"]},
+  {"id": "multi-course-exam-award", "scenario": "One AP score awards two UW courses", "expected_disposition": "publish_aligned_awards", "required_assertions": ["course and credit arrays align", "score band retained"]},
+  {"id": "exam-major-applicability-unknown", "scenario": "AP table does not state whether credit applies to a major", "expected_disposition": "publish_unknown_not_false", "required_assertions": ["major applicability equals unknown"]},
+  {"id": "higher-major-grade-floor", "scenario": "Major admission page requires a higher grade than the catalog prerequisite", "expected_disposition": "publish_scoped_requirements", "required_assertions": ["both grade floors retained", "scope distinguishes enrollment from major admission"]},
+  {"id": "nested-prerequisite-logic", "scenario": "A prerequisite contains nested AND and OR groups", "expected_disposition": "publish_recursive_ast", "required_assertions": ["grouping retained", "unresolved is not false"]},
+  {"id": "official-source-conflict", "scenario": "Overlapping official sources state different credit limits", "expected_disposition": "block_and_review", "required_assertions": ["differing fields listed", "effective periods compared"]},
+  {"id": "critical-table-footnote", "scenario": "A table footnote limits how credit applies to the degree", "expected_disposition": "publish_with_footnote", "required_assertions": ["headers retained", "row retained", "footnote retained"]},
+  {"id": "unclear-catalog-year", "scenario": "A policy page has no clear catalog year or effective date", "expected_disposition": "review", "required_assertions": ["date not invented", "uncertainty recorded"]},
+  {"id": "explicit-no-credit", "scenario": "The source affirmatively says no credit is awarded", "expected_disposition": "publish_explicit_no_credit", "required_assertions": ["exact no-credit quote retained"]},
+  {"id": "no-mapping-result", "scenario": "An equivalency search has no matching result", "expected_disposition": "not_found_only", "required_assertions": ["not converted to no credit"]},
+  {"id": "recommended-preparation", "scenario": "A department recommends preparation without requiring it", "expected_disposition": "publish_recommendation", "required_assertions": ["recommended true", "mandatory false"]}
+]

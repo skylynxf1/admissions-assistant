@@ -65,7 +65,9 @@ class DoclingTranscriptParser(TranscriptParser):
         for page_number in range(1, page_count + 1):
             blocks = page_blocks.get(page_number, [])
             text = "\n".join(block.text for block in blocks if block.text)
-            pages.append(ParsedPage(pageNumber=page_number, markdown=text, text=text, blocks=blocks))
+            pages.append(
+                ParsedPage(pageNumber=page_number, markdown=text, text=text, blocks=blocks)
+            )
 
         return ParsedDocument(
             parser="docling",

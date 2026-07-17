@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -327,7 +327,7 @@ class RecommendationResponse(BaseModel):
     recommendations: list[CourseRecommendation]
     excluded_courses: list[ExcludedCourse]
     data_warnings: list[str]
-    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     scenario_fingerprint: str
     cache_hit: bool = False
 

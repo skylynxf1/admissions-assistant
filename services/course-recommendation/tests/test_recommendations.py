@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.models import (
     Confidence,
     CourseRecommendationFeatures,
@@ -65,7 +64,11 @@ async def test_course_helping_multiple_majors_is_identified(dataset):
 async def test_course_helping_multiple_universities_keeps_outcomes_separate(dataset):
     calc2 = recommendation(await response_for(dataset), "calc2")
     assert calc2.features.selected_institutions_helped == 2
-    assert calc2.features.university_coverage[UW] == ["DIRECT_EQUIVALENT", "GENERAL_EDUCATION", "PREREQUISITE_APPLICABLE"]
+    assert calc2.features.university_coverage[UW] == [
+        "DIRECT_EQUIVALENT",
+        "GENERAL_EDUCATION",
+        "PREREQUISITE_APPLICABLE",
+    ]
 
 
 @pytest.mark.asyncio
@@ -87,7 +90,8 @@ async def test_infrequently_offered_course_is_flagged(dataset):
 async def test_unknown_equivalency_is_not_counted_and_can_be_excluded(dataset):
     dataset.equivalencies = [
         item.model_copy(update={"confidence": Confidence.UNKNOWN})
-        if item.source_course_id == "calc2" else item
+        if item.source_course_id == "calc2"
+        else item
         for item in dataset.equivalencies
     ]
     response = await response_for(dataset, include_uncertain=False)
@@ -126,8 +130,18 @@ def test_low_portability_course_uses_nonjudgmental_label():
 def test_priority_weighted_programs_change_major_coverage_score():
     scorer = WeightedRecommendationScorer()
     config = RecommendationWeightConfig()
-    high = scorer.score(feature(scenario_priorities_helped=[1]), config, all_program_priorities=[1, 3], selected_institution_count=2)
-    low = scorer.score(feature(scenario_priorities_helped=[3]), config, all_program_priorities=[1, 3], selected_institution_count=2)
+    high = scorer.score(
+        feature(scenario_priorities_helped=[1]),
+        config,
+        all_program_priorities=[1, 3],
+        selected_institution_count=2,
+    )
+    low = scorer.score(
+        feature(scenario_priorities_helped=[3]),
+        config,
+        all_program_priorities=[1, 3],
+        selected_institution_count=2,
+    )
     assert high.breakdown["major_coverage_score"] > low.breakdown["major_coverage_score"]
 
 
@@ -156,14 +170,23 @@ def test_deterministic_score_calculation_has_complete_breakdown():
         general_education_categories_satisfied=["QR"],
         estimated_graduation_terms_saved=1,
     )
-    first = scorer.score(features, config, all_program_priorities=[1, 2], selected_institution_count=2)
-    second = scorer.score(features, config, all_program_priorities=[1, 2], selected_institution_count=2)
+    first = scorer.score(
+        features, config, all_program_priorities=[1, 2], selected_institution_count=2
+    )
+    second = scorer.score(
+        features, config, all_program_priorities=[1, 2], selected_institution_count=2
+    )
     assert first == second
     assert set(first.breakdown) == {
-        "major_coverage_score", "university_coverage_score", "unlock_score",
-        "dual_requirement_score", "graduation_acceleration_score",
-        "infrequent_offering_score", "uncertain_equivalency_penalty",
-        "dead_end_penalty", "duplicate_credit_penalty",
+        "major_coverage_score",
+        "university_coverage_score",
+        "unlock_score",
+        "dual_requirement_score",
+        "graduation_acceleration_score",
+        "infrequent_offering_score",
+        "uncertain_equivalency_penalty",
+        "dead_end_penalty",
+        "duplicate_credit_penalty",
     }
 
 
@@ -174,7 +197,9 @@ async def test_stable_recommendation_ordering(dataset):
     assert [(item.course_id, item.score) for item in first.recommendations] == [
         (item.course_id, item.score) for item in second.recommendations
     ]
-    assert [item.rank for item in first.recommendations] == list(range(1, len(first.recommendations) + 1))
+    assert [item.rank for item in first.recommendations] == list(
+        range(1, len(first.recommendations) + 1)
+    )
 
 
 def test_scenario_fingerprint_changes_with_academic_inputs(dataset):

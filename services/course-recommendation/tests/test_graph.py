@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.graph import PrerequisiteCycleError, build_prerequisite_graph
 from conftest import course_group
 
@@ -32,7 +31,12 @@ def test_branching_graph_unlocks_direct_and_transitive_courses(chain_courses):
         ],
     )
     assert ids(graph.get_directly_unlocked_courses("calc1")) == ["calc2", "physics1"]
-    assert ids(graph.get_all_unlocked_descendants("calc1")) == ["calc2", "linear", "physics1", "physics2"]
+    assert ids(graph.get_all_unlocked_descendants("calc1")) == [
+        "calc2",
+        "linear",
+        "physics1",
+        "physics2",
+    ]
 
 
 def test_graph_nodes_and_edges_retain_structured_metadata(chain_courses):
