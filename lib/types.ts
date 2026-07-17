@@ -60,6 +60,13 @@ export interface CourseRecord {
   repeat: boolean;
   transfer: boolean;
   notes?: string;
+  sourcePage?: number;
+  extractionConfidence?: number;
+  rawText?: string;
+  sourceDocumentId?: string;
+  normalizedRecordId?: string;
+  normalizedInstitutionId?: string;
+  normalizedTermId?: string;
 }
 
 export interface ExamCredit {
@@ -69,6 +76,10 @@ export interface ExamCredit {
   score: string;
   creditsAwarded: number;
   enabled: boolean;
+  sourcePage?: number;
+  extractionConfidence?: number;
+  sourceDocumentId?: string;
+  normalizedRecordId?: string;
 }
 
 export interface TranscriptData {

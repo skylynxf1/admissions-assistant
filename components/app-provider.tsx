@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { createSampleTranscript } from "@/data/sample-transcript";
 import { academicPlanningServices } from "@/lib/services";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
   AcademicAnalysisInput,
   AdvisorMessage,
@@ -50,6 +51,7 @@ interface AppContextValue extends PersistedState {
   analysis: AnalysisResult | null;
   analysisStatus: "idle" | "analyzing" | "ready" | "error";
   advisorMessages: AdvisorMessage[];
+  draftStatus: "idle" | "saving" | "saved-local" | "saved-cloud" | "error";
   setMode: (mode: PlanningMode) => void;
   setProfile: (profile: StudentProfile) => void;
   setTranscript: (transcript: TranscriptData) => void;
@@ -59,6 +61,7 @@ interface AppContextValue extends PersistedState {
   updateScenario: (updates: Partial<ScenarioSettings>) => void;
   rerunAnalysis: () => Promise<void>;
   setAdvisorMessages: (messages: AdvisorMessage[]) => void;
+  saveDraft: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -86,6 +89,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       citationIds: [],
     },
   ]);
+  const [draftStatus, setDraftStatus] = useState<AppContextValue["draftStatus"]>("idle");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -155,12 +159,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setScenario((current) => ({ ...current, ...updates }));
   }, []);
 
+  const saveDraft = useCallback(async () => {
+    setDraftStatus("saving");
+    const persistedState: PersistedState = { mode, profile, transcript, targets, prioritySchoolId, scenario };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persistedState));
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setDraftStatus("saved-local");
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token;
+    if (!accessToken) {
+      setDraftStatus("saved-local");
+      return;
+    }
+    try {
+      const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+      const [transcriptResponse, scenarioResponse] = await Promise.all([
+        fetch("/api/transcripts", { method: "POST", headers, body: JSON.stringify({ transcript, profile }) }),
+        fetch("/api/scenarios", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            clientId: "active-transfer-plan",
+            name: "My transfer plan",
+            planningMode: mode,
+            prioritySchoolId,
+            input: { profile, transcript, targets, scenario },
+            analysis,
+          }),
+        }),
+      ]);
+      if (!transcriptResponse.ok || !scenarioResponse.ok) throw new Error("Cloud save failed");
+      setDraftStatus("saved-cloud");
+    } catch {
+      setDraftStatus("error");
+    }
+  }, [mode, profile, transcript, targets, prioritySchoolId, scenario, analysis]);
+
   const value = useMemo<AppContextValue>(
     () => ({
-      mode, profile, transcript, targets, prioritySchoolId, scenario, analysis, analysisStatus, advisorMessages,
-      setMode, setProfile, setTranscript, setTargets, setPrioritySchoolId, setScenario, updateScenario, rerunAnalysis, setAdvisorMessages,
+      mode, profile, transcript, targets, prioritySchoolId, scenario, analysis, analysisStatus, advisorMessages, draftStatus,
+      setMode, setProfile, setTranscript, setTargets, setPrioritySchoolId, setScenario, updateScenario, rerunAnalysis, setAdvisorMessages, saveDraft,
     }),
-    [mode, profile, transcript, targets, prioritySchoolId, scenario, analysis, analysisStatus, advisorMessages, setProfile, updateScenario, rerunAnalysis],
+    [mode, profile, transcript, targets, prioritySchoolId, scenario, analysis, analysisStatus, advisorMessages, draftStatus, setProfile, updateScenario, rerunAnalysis, saveDraft],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

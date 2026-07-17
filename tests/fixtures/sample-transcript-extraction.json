@@ -1,0 +1,26 @@
+{
+  "documentType": "college_transcript",
+  "studentName": "Fixture Student",
+  "institutions": [{
+    "id": "institution-1", "name": "Example Community College", "studentIdentifier": null,
+    "attendanceStart": null, "attendanceEnd": null, "degreeName": null, "degreeDate": null, "confidence": 0.98,
+    "source": { "pageNumber": 1, "parserBlockIds": ["block-1"], "rawText": "Example Community College" }
+  }],
+  "terms": [{
+    "id": "term-1", "institutionId": "institution-1", "label": "Fall 2025", "startDate": null, "endDate": null,
+    "academicLevel": "Undergraduate", "creditsAttempted": 5, "creditsEarned": 5, "termGpa": 4, "confidence": 0.95,
+    "source": { "pageNumber": 1, "parserBlockIds": ["block-2"], "rawText": "Fall 2025" }
+  }],
+  "courses": [{
+    "id": "course-1", "institutionId": "institution-1", "termId": "term-1", "courseCode": "math 101",
+    "courseTitle": "  College   Algebra ", "creditsAttempted": 5, "creditsEarned": 5, "grade": "a", "status": "completed",
+    "repeatIndicator": false, "transferIndicator": false, "confidence": 0.97,
+    "source": { "pageNumber": 1, "parserBlockIds": ["block-3"], "rawText": "MATH 101 College Algebra 5.0 A" }
+  }],
+  "examCredits": [],
+  "summary": {
+    "cumulativeGpa": 4, "totalCreditsAttempted": 5, "totalCreditsEarned": 5, "totalQualityPoints": 20,
+    "degreeName": null, "degreeDate": null, "confidence": 0.96,
+    "source": { "pageNumber": 1, "parserBlockIds": ["block-4"], "rawText": "Cumulative GPA 4.0" }
+  }
+}

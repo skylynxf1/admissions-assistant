@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, Cloud, HardDrive, LoaderCircle } from "lucide-react";
 import { BrandMark } from "@/components/ui";
+import { useApp } from "@/components/app-provider";
 
 const steps = [
   { label: "Plan type", href: "/" },
@@ -15,6 +16,7 @@ const steps = [
 
 export function FlowShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { draftStatus, saveDraft } = useApp();
   const activeIndex = Math.max(0, steps.findIndex((step) => step.href === pathname));
   return (
     <div className="min-h-screen bg-[var(--canvas)]">
@@ -26,7 +28,10 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
             <span className="text-xs text-slate-400">No API key needed</span>
           </div>
           <div className="flex items-center gap-2">
-            <button className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">Save draft</button>
+            <button onClick={() => void saveDraft()} disabled={draftStatus === "saving"} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60">
+              {draftStatus === "saving" ? <LoaderCircle className="size-3.5 animate-spin" /> : draftStatus === "saved-cloud" ? <Cloud className="size-3.5 text-teal-600" /> : draftStatus === "saved-local" ? <HardDrive className="size-3.5 text-teal-600" /> : null}
+              {draftStatus === "saving" ? "Saving…" : draftStatus === "saved-cloud" ? "Saved to cloud" : draftStatus === "saved-local" ? "Saved locally" : draftStatus === "error" ? "Save failed" : "Save draft"}
+            </button>
             <div className="grid size-8 place-items-center rounded-full bg-gradient-to-br from-teal-500 to-cyan-700 text-xs font-bold text-white">AS</div>
           </div>
         </div>

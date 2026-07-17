@@ -7,7 +7,13 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:lint": "supabase db lint --local",
+    "supabase:types": "supabase gen types typescript --local --schema public,catalog,source,policy,equivalency,student,planning"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0",
@@ -24,6 +30,7 @@
     "@types/react-dom": "^19.1.0",
     "eslint": "^9.31.0",
     "eslint-config-next": "^15.4.0",
+    "supabase": "^2.109.1",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.8.0"
   }

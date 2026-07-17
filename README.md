@@ -6,7 +6,7 @@ Pathwise is a demo-ready academic transfer planning and simulation experience bu
 
 ## Quick start
 
-Requirements: Node.js 20+ and pnpm 9+ (npm also works).
+Requirements: Node.js 22+ and pnpm 9+ (npm also works).
 
 ```bash
 pnpm install
@@ -29,15 +29,21 @@ pnpm build
 - `components/` — reusable flow, dashboard, and UI components
 - `lib/services/` — typed academic-planning service contracts and isolated mock implementations
 - `data/` — sample transcript and university/major policies
-- `supabase/schema.sql` — suggested persistence schema with row-level security notes
+- `supabase/migrations/` — executable domain-separated Supabase schema, indexes, storage, and RLS
+- `supabase/seed.sql` — labeled local sample catalog data
+- `docs/BACKEND.md` — Supabase setup, security model, routes, and ingestion contract
 - `docs/product-spec.md` — original product specification
 - `docs/GPT56_TODO.md` — concise production integration plan
 
 The frontend calls the same strict TypeScript models used by the mock service layer. Server route placeholders expose transcript extraction, academic analysis, scenario simulation, and advisor chat boundaries that can be replaced with structured GPT-5.6 responses later.
 
+The private transcript ingestion architecture—including Docling worker setup, strict extraction, validation, review APIs, and Supabase tables—is documented in [docs/TRANSCRIPT_PIPELINE.md](docs/TRANSCRIPT_PIPELINE.md).
+
 ## Optional environment setup
 
-Copy `.env.example` to `.env.local` and add OpenAI/Supabase credentials when connecting production services. The current route implementations intentionally continue using sample services even when keys are present, so a key cannot accidentally make the demo claim unverified policy results.
+Copy `.env.example` to `.env.local` and add OpenAI/Supabase credentials when connecting production services. Live transcript extraction additionally needs the private Docling worker. Academic-policy analysis remains sample-only and never claims its results are official.
+
+For the database, run the checked-in Supabase migrations and follow [docs/BACKEND.md](docs/BACKEND.md). With a signed-in Supabase session, **Save draft** persists the transcript and scenario; without Supabase or authentication it safely remains a local-browser save.
 
 ## Primary demo path
 
