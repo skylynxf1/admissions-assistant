@@ -2,7 +2,6 @@ import type {
   AcademicAnalysisInput,
   AdvisorAnswer,
   AdvisorInput,
-  AnalysisAlert,
   AnalysisResult,
   CourseEquivalency,
   CourseRecord,
@@ -12,6 +11,7 @@ import type {
   RequirementResult,
   SchoolDefinition,
   TranscriptData,
+  VerificationItem,
 } from "@/lib/types";
 
 export interface TranscriptParser {
@@ -28,6 +28,10 @@ export interface PolicyRetrievalService {
 
 export interface EquivalencyAnalyzer {
   analyze(input: AcademicAnalysisInput): Promise<CourseEquivalency[]>;
+}
+
+export interface VerificationEvaluator {
+  evaluate(input: AcademicAnalysisInput, equivalencies: CourseEquivalency[]): Promise<VerificationItem[]>;
 }
 
 export interface RequirementEvaluator {
@@ -51,7 +55,7 @@ export interface AdvisorChatService {
 }
 
 export interface UncertaintyEscalationHandler {
-  draftEmail(alert: AnalysisAlert, input: AcademicAnalysisInput): Promise<DraftEmail>;
+  draftEmail(item: VerificationItem, input: AcademicAnalysisInput): Promise<DraftEmail>;
 }
 
 export interface AcademicPlanningServices {
@@ -59,6 +63,7 @@ export interface AcademicPlanningServices {
   normalizer: AcademicRecordNormalizer;
   policyRetrieval: PolicyRetrievalService;
   equivalencyAnalyzer: EquivalencyAnalyzer;
+  verificationEvaluator: VerificationEvaluator;
   requirementEvaluator: RequirementEvaluator;
   prerequisiteGraph: PrerequisiteGraphService;
   recommendationEngine: CourseRecommendationEngine;

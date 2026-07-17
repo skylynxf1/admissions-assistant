@@ -10,10 +10,12 @@ import {
   MockScenarioSimulator,
   MockTranscriptParser,
   MockUncertaintyEscalationHandler,
+  MockVerificationEvaluator,
 } from "@/lib/services/mock";
 
 const policyRetrieval = new MockPolicyRetrievalService();
 const equivalencyAnalyzer = new MockEquivalencyAnalyzer();
+const verificationEvaluator = new MockVerificationEvaluator();
 const requirementEvaluator = new MockRequirementEvaluator();
 const prerequisiteGraph = new MockPrerequisiteGraphService();
 const recommendationEngine = new MockCourseRecommendationEngine();
@@ -23,12 +25,14 @@ export const academicPlanningServices: AcademicPlanningServices = {
   normalizer: new MockAcademicRecordNormalizer(),
   policyRetrieval,
   equivalencyAnalyzer,
+  verificationEvaluator,
   requirementEvaluator,
   prerequisiteGraph,
   recommendationEngine,
   scenarioSimulator: new MockScenarioSimulator(
     policyRetrieval,
     equivalencyAnalyzer,
+    verificationEvaluator,
     requirementEvaluator,
     prerequisiteGraph,
     recommendationEngine,

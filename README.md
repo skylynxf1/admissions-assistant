@@ -84,6 +84,34 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) and choose **Transfer planning**.
 
+1. Select Transfer Planning.
+2. Complete the short student profile.
+3. Upload a PDF for sample extraction or choose manual entry, then review and edit every course field.
+4. Search for destination schools, check multiple options, and choose one priority school.
+5. Pick one or more priority-school majors and read the short requirement outline.
+6. Open the planning playground and drag recommended courses into editable quarter templates.
+7. Use the simulator to add or remove schools, majors, transcript courses, grades, AP/IB credit, and planned courses.
+8. Change current school/type, residency, enrollment term, maximum quarterly load, summer attendance, and graduation target.
+9. Watch transfer and major eligibility, missing prerequisites, general education, credits, timeline, and open options recalculate.
+10. Save multiple scenarios in the Compare tab, restore any version, or export the visible plan as a readable PDF.
+11. Open Verification to distinguish confirmed, likely, unclear, manual-evaluation, and conflicting results; inspect every checked source and draft an exact-context email for unresolved items.
+12. Ask the grounded advisor a question or review the sample source records behind the plan.
+
+## Verification safeguards
+
+The typed verification layer stores the status, source course, institution, term, destination school,
+exact question, responsible office, and the outcome of each checked source. A destination course is
+only displayed when a saved source explicitly contains that mapping. Unresolved results never infer
+an equivalency; they explain the gap and can generate a reviewable email draft without sending it.
+
+## Simulator coverage
+
+The playground keeps all editable inputs in the typed scenario, transcript, and target-school models.
+The mock simulation service—not the UI—calculates transfer eligibility, major readiness,
+prerequisite gaps, general-education progress, projected transferable credit, estimated remaining
+credit, graduation timing, term overloads, GPA, and the academic options that remain open. Saved
+comparison plans capture the complete scenario and can be restored during the session.
+
 ## Quality gates
 
 ```bash

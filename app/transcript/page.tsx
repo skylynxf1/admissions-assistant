@@ -2,143 +2,162 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, CheckCircle2, FileText, LoaderCircle, PencilLine, Plus, Trash2, UploadCloud } from "lucide-react";
+import { ArrowRight, Check, FileText, LoaderCircle, Pencil, Plus, Trash2, UploadCloud } from "lucide-react";
 import { useApp } from "@/components/app-provider";
-import { ConfidenceBadge, EmptyState, SampleDataBanner } from "@/components/ui";
 import { academicPlanningServices } from "@/lib/services";
 import type { CourseRecord } from "@/lib/types";
 
+type InputChoice = "pdf" | "manual" | null;
+
 export default function TranscriptPage() {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const { transcript, setTranscript } = useApp();
-  const [inputMode, setInputMode] = useState<"pdf" | "manual">("pdf");
-  const [status, setStatus] = useState<"idle" | "extracting" | "ready" | "error">(transcript.courses.length ? "ready" : "idle");
+  const [choice, setChoice] = useState<InputChoice>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const extractFile = async (file?: File) => {
+  const loadPdf = async (file?: File) => {
     if (file && file.type !== "application/pdf") {
-      setError("Please choose a PDF transcript.");
-      setStatus("error");
+      setError("Please choose a PDF file.");
       return;
     }
+    setChoice("pdf");
+    setLoading(true);
     setError("");
-    setStatus("extracting");
-    setTranscript({ ...transcript, extractionStatus: "extracting", fileName: file?.name ?? "sample-transfer-transcript.pdf" });
-    await new Promise((resolve) => window.setTimeout(resolve, 650));
     try {
+      await new Promise((resolve) => window.setTimeout(resolve, 550));
       const parsed = await academicPlanningServices.transcriptParser.parse(file?.name);
-      setTranscript(parsed);
-      setStatus("ready");
+      setTranscript({ ...parsed, verificationStatus: "reviewing" });
     } catch {
-      setError("The demo parser could not load the sample transcript. Try manual input.");
-      setStatus("error");
+      setError("We couldn’t read that file. Try manual entry instead.");
+      setChoice(null);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const startManual = () => {
+    setChoice("manual");
+    setTranscript({
+      ...transcript,
+      fileName: undefined,
+      courses: [],
+      institutions: [transcript.institutions[0] || ""],
+      extractionStatus: "complete",
+      verificationStatus: "reviewing",
+    });
+  };
+
   const updateCourse = (id: string, patch: Partial<CourseRecord>) => {
-    setTranscript({ ...transcript, verificationStatus: "reviewing", courses: transcript.courses.map((course) => course.id === id ? { ...course, ...patch } : course) });
+    setTranscript({
+      ...transcript,
+      verificationStatus: "reviewing",
+      courses: transcript.courses.map((course) => course.id === id ? { ...course, ...patch } : course),
+    });
   };
 
   const addCourse = () => {
     const course: CourseRecord = {
-      id: `manual-${Date.now()}`, institution: transcript.institutions[0] ?? "", code: "", title: "", term: "Fall 2026",
-      creditsAttempted: 5, creditsEarned: 0, grade: "IP", status: "planned", confidence: "high", repeat: false, transfer: false,
+      id: `manual-${Date.now()}`,
+      institution: transcript.institutions[0] || "",
+      code: "",
+      title: "",
+      term: "Fall 2026",
+      creditsAttempted: 5,
+      creditsEarned: 0,
+      grade: "IP",
+      status: "planned",
+      confidence: "high",
+      repeat: false,
+      transfer: false,
     };
-    setTranscript({ ...transcript, verificationStatus: "reviewing", courses: [...transcript.courses, course] });
-    setStatus("ready");
+    setTranscript({ ...transcript, courses: [...transcript.courses, course] });
   };
 
-  const startManual = () => {
-    setInputMode("manual");
-    setTranscript({ ...transcript, fileName: undefined, courses: [], institutions: [transcript.institutions[0] ?? ""], extractionStatus: "complete", verificationStatus: "reviewing" });
-    setStatus("idle");
-  };
-
-  const continueToTargets = () => {
+  const continueFlow = () => {
     setTranscript({ ...transcript, verificationStatus: "confirmed" });
     router.push("/targets");
   };
 
+  if (!choice) {
+    return (
+      <main className="mx-auto flex min-h-[calc(100vh-130px)] max-w-3xl items-center px-5 py-12">
+        <section className="w-full text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Your transcript</p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.045em] text-[var(--ink)] sm:text-4xl">Add your academic record.</h1>
+          <p className="mx-auto mt-3 max-w-xl text-slate-500">We’ll turn it into an editable course list. You review everything before it affects your plan.</p>
+
+          <input ref={fileInput} type="file" accept="application/pdf" className="hidden" onChange={(event) => void loadPdf(event.target.files?.[0])} />
+          <div className="card mx-auto mt-8 max-w-xl p-5 sm:p-7">
+            <button onClick={() => fileInput.current?.click()} className="group flex w-full flex-col items-center rounded-2xl border-2 border-dashed border-teal-200 bg-teal-50/40 px-6 py-12 transition hover:border-teal-400 hover:bg-teal-50">
+              <span className="grid size-14 place-items-center rounded-2xl bg-white text-teal-700 shadow-sm transition group-hover:-translate-y-0.5"><UploadCloud className="size-6" /></span>
+              <span className="mt-4 text-base font-semibold text-slate-900">Upload PDF transcript</span>
+              <span className="mt-1 text-sm text-slate-500">Official or unofficial · PDF only</span>
+            </button>
+            <button onClick={() => void loadPdf()} className="mt-3 text-xs font-semibold text-teal-700 hover:underline">Or try the sample PDF</button>
+            <div className="my-6 flex items-center gap-3"><span className="h-px flex-1 bg-slate-200" /><span className="text-xs font-medium text-slate-400">or</span><span className="h-px flex-1 bg-slate-200" /></div>
+            <button onClick={startManual} className="secondary-button w-full"><Pencil className="size-4" /> Enter courses manually</button>
+            {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (loading) {
+    return (
+      <main className="mx-auto flex min-h-[calc(100vh-130px)] max-w-2xl items-center justify-center px-5 text-center">
+        <div><LoaderCircle className="mx-auto size-8 animate-spin text-teal-600" /><h1 className="mt-4 text-xl font-semibold text-slate-900">Reading your transcript…</h1><p className="mt-2 text-sm text-slate-500">Creating an editable review. Nothing is final yet.</p></div>
+      </main>
+    );
+  }
+
   const earned = transcript.courses.filter((course) => course.status === "completed").reduce((sum, course) => sum + course.creditsEarned, 0);
-  const uncertain = transcript.courses.filter((course) => course.confidence !== "high").length;
 
   return (
-    <main className="mx-auto max-w-[1280px] px-5 py-10 lg:px-8 lg:py-12">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Your academic record</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] text-[var(--ink)]">Upload, then verify every detail.</h1><p className="mt-2 max-w-2xl text-slate-600">Nothing is locked. Correct course codes, grades, credits, or confidence before analysis.</p></div>
-        <div className="flex rounded-xl border border-slate-200 bg-white p-1">
-          <button onClick={() => setInputMode("pdf")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${inputMode === "pdf" ? "bg-[var(--ink)] text-white" : "text-slate-500"}`}>PDF upload</button>
-          <button onClick={startManual} className={`rounded-lg px-3 py-2 text-sm font-semibold ${inputMode === "manual" ? "bg-[var(--ink)] text-white" : "text-slate-500"}`}>Manual input</button>
+    <main className="mx-auto max-w-6xl px-5 py-10 lg:px-8 lg:py-12">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-teal-700"><Check className="size-3.5" /> {choice === "pdf" ? "PDF added" : "Manual entry"}</div>
+          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">Review your courses.</h1>
+          <p className="mt-2 text-sm text-slate-500">Edit anything that doesn’t look right.</p>
         </div>
+        <div className="flex gap-2"><button onClick={() => setChoice(null)} className="secondary-button">Start over</button><button onClick={addCourse} className="secondary-button"><Plus className="size-4" /> Add course</button></div>
       </div>
 
-      <div className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
-        <section className="space-y-5">
-          {inputMode === "pdf" && (
-            <div className="card p-5">
-              <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={(event) => void extractFile(event.target.files?.[0])} />
-              {status === "extracting" ? (
-                <div className="flex min-h-44 flex-col items-center justify-center rounded-2xl border border-teal-200 bg-teal-50/60 text-center">
-                  <LoaderCircle className="size-7 animate-spin text-teal-600" /><p className="mt-3 font-semibold text-teal-950">Extracting a sample academic record…</p><p className="mt-1 text-sm text-teal-700">In production, GPT-5.6 will return structured fields with page-level confidence.</p>
-                </div>
-              ) : (
-                <div className="flex min-h-44 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 text-center">
-                  <div className="grid size-11 place-items-center rounded-xl bg-white text-teal-700 shadow-sm"><UploadCloud className="size-5" /></div>
-                  <p className="mt-3 font-semibold text-slate-900">Upload a PDF of your transcript</p><p className="mt-1 text-sm text-slate-500">Official or unofficial · PDF only · demo uses fictional extraction</p>
-                  <div className="mt-4 flex flex-wrap justify-center gap-2"><button onClick={() => fileInputRef.current?.click()} className="primary-button">Choose PDF</button><button onClick={() => void extractFile()} className="secondary-button">Use demo transcript</button></div>
-                </div>
-              )}
-              {status === "error" && <div className="mt-3 flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700"><AlertCircle className="size-4" />{error}</div>}
-              {transcript.fileName && status === "ready" && <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5"><div className="flex items-center gap-2.5"><FileText className="size-4 text-teal-600" /><div><p className="text-sm font-medium text-slate-800">{transcript.fileName}</p><p className="text-xs text-slate-400">Sample extraction complete · review required</p></div></div><CheckCircle2 className="size-5 text-emerald-500" /></div>}
-            </div>
-          )}
+      {choice === "pdf" && transcript.fileName && (
+        <div className="mt-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"><FileText className="size-4 text-teal-600" /><span className="font-medium text-slate-800">{transcript.fileName}</span><span className="ml-auto text-xs text-slate-400">Sample extraction · editable</span></div>
+      )}
 
-          <div className="card overflow-hidden">
-            <div className="flex flex-col justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center">
-              <div><div className="flex items-center gap-2"><PencilLine className="size-4 text-teal-600" /><h2 className="font-semibold text-slate-900">Transcript review</h2></div><p className="mt-1 text-xs text-slate-500">{transcript.courses.length} records · {uncertain} need extra attention</p></div>
-              <button onClick={addCourse} className="secondary-button !min-h-9 !px-3 !py-1.5"><Plus className="size-3.5" /> Add course</button>
-            </div>
-            {transcript.courses.length === 0 ? <div className="p-5"><EmptyState title="No courses yet" description="Add your first course manually, or switch to PDF upload and use the demo transcript." /></div> : (
-              <div className="desktop-table">
-                <table className="w-full min-w-[980px] border-collapse text-left">
-                  <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Institution</th><th className="px-3 py-3">Course</th><th className="px-3 py-3">Title</th><th className="px-3 py-3">Term</th><th className="px-3 py-3">Credits</th><th className="px-3 py-3">Grade</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Confidence</th><th className="px-3 py-3" /></tr></thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {transcript.courses.map((course) => (
-                      <tr key={course.id} className="group hover:bg-teal-50/30">
-                        <td className="px-4 py-2"><input value={course.institution} onChange={(event) => updateCourse(course.id, { institution: event.target.value })} className="w-36 bg-transparent text-xs text-slate-600 outline-none focus:text-slate-900" /></td>
-                        <td className="px-3 py-2"><input value={course.code} onChange={(event) => updateCourse(course.id, { code: event.target.value })} className="w-24 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm font-semibold text-slate-900 outline-none focus:border-teal-300 focus:bg-white" /></td>
-                        <td className="px-3 py-2"><input value={course.title} onChange={(event) => updateCourse(course.id, { title: event.target.value })} className="w-40 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm text-slate-700 outline-none focus:border-teal-300 focus:bg-white" /></td>
-                        <td className="px-3 py-2"><input value={course.term} onChange={(event) => updateCourse(course.id, { term: event.target.value })} className="w-24 bg-transparent text-xs text-slate-600 outline-none" /></td>
-                        <td className="px-3 py-2"><input type="number" min="0" step="0.5" value={course.creditsAttempted} onChange={(event) => updateCourse(course.id, { creditsAttempted: Number(event.target.value), creditsEarned: course.status === "completed" ? Number(event.target.value) : course.creditsEarned })} className="w-14 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-teal-400" /></td>
-                        <td className="px-3 py-2"><input value={course.grade} onChange={(event) => updateCourse(course.id, { grade: event.target.value })} className="w-12 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-teal-400" /></td>
-                        <td className="px-3 py-2"><select value={course.status} onChange={(event) => updateCourse(course.id, { status: event.target.value as CourseRecord["status"] })} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600"><option value="completed">Completed</option><option value="in-progress">In progress</option><option value="planned">Planned</option></select></td>
-                        <td className="px-3 py-2"><div className="flex items-center gap-2"><ConfidenceBadge level={course.confidence} /><select aria-label={`Confidence for ${course.code}`} value={course.confidence} onChange={(event) => updateCourse(course.id, { confidence: event.target.value as CourseRecord["confidence"] })} className="w-5 opacity-0 transition group-hover:opacity-100"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div></td>
-                        <td className="px-3 py-2"><button aria-label={`Delete ${course.code}`} onClick={() => setTranscript({ ...transcript, courses: transcript.courses.filter((item) => item.id !== course.id) })} className="rounded-lg p-2 text-slate-300 hover:bg-rose-50 hover:text-rose-500"><Trash2 className="size-4" /></button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+      <section className="card mt-4 overflow-hidden">
+        {transcript.courses.length === 0 ? (
+          <div className="flex min-h-72 flex-col items-center justify-center px-5 text-center"><div className="grid size-12 place-items-center rounded-2xl bg-slate-100 text-slate-400"><Pencil className="size-5" /></div><h2 className="mt-4 font-semibold text-slate-900">Add your first course</h2><p className="mt-1 text-sm text-slate-500">Course code, title, credits, and grade are enough to start.</p><button onClick={addCourse} className="primary-button mt-5"><Plus className="size-4" /> Add course</button></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[840px] text-left">
+              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th className="px-4 py-3">Course</th><th className="px-3 py-3">Title</th><th className="px-3 py-3">Term</th><th className="px-3 py-3">Credits</th><th className="px-3 py-3">Grade</th><th className="px-3 py-3">Status</th><th className="w-12" /></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {transcript.courses.map((course) => (
+                  <tr key={course.id} className="hover:bg-teal-50/30">
+                    <td className="px-4 py-2.5"><input aria-label={`Course code ${course.id}`} value={course.code} onChange={(event) => updateCourse(course.id, { code: event.target.value })} className="w-28 rounded-lg border border-transparent bg-transparent px-2 py-2 text-sm font-semibold outline-none focus:border-teal-300 focus:bg-white" /></td>
+                    <td className="px-3 py-2.5"><input aria-label={`Course title ${course.id}`} value={course.title} onChange={(event) => updateCourse(course.id, { title: event.target.value })} className="w-52 rounded-lg border border-transparent bg-transparent px-2 py-2 text-sm outline-none focus:border-teal-300 focus:bg-white" /></td>
+                    <td className="px-3 py-2.5"><input aria-label={`Course term ${course.id}`} value={course.term} onChange={(event) => updateCourse(course.id, { term: event.target.value })} className="w-28 rounded-lg border border-transparent bg-transparent px-2 py-2 text-sm text-slate-600 outline-none focus:border-teal-300 focus:bg-white" /></td>
+                    <td className="px-3 py-2.5"><input aria-label={`Credits ${course.id}`} type="number" min="0" step="0.5" value={course.creditsAttempted} onChange={(event) => updateCourse(course.id, { creditsAttempted: Number(event.target.value), creditsEarned: course.status === "completed" ? Number(event.target.value) : 0 })} className="w-16 rounded-lg border border-slate-200 px-2 py-2 text-sm outline-none focus:border-teal-400" /></td>
+                    <td className="px-3 py-2.5"><input aria-label={`Grade ${course.id}`} value={course.grade} onChange={(event) => updateCourse(course.id, { grade: event.target.value })} className="w-14 rounded-lg border border-slate-200 px-2 py-2 text-sm outline-none focus:border-teal-400" /></td>
+                    <td className="px-3 py-2.5"><select aria-label={`Status ${course.id}`} value={course.status} onChange={(event) => updateCourse(course.id, { status: event.target.value as CourseRecord["status"] })} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"><option value="completed">Completed</option><option value="in-progress">In progress</option><option value="planned">Planned</option></select></td>
+                    <td className="pr-3"><button aria-label={`Delete ${course.code || "course"}`} onClick={() => setTranscript({ ...transcript, courses: transcript.courses.filter((item) => item.id !== course.id) })} className="rounded-lg p-2 text-slate-300 hover:bg-rose-50 hover:text-rose-500"><Trash2 className="size-4" /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        )}
+      </section>
 
-          {transcript.examCredits.length > 0 && (
-            <div className="card p-5"><div className="flex items-center justify-between gap-4"><div><h2 className="font-semibold text-slate-900">Exam credit</h2><p className="mt-1 text-xs text-slate-500">Applicability will be evaluated separately for each target program.</p></div><span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">{transcript.examCredits.length} record</span></div>
-              {transcript.examCredits.map((credit) => <div key={credit.id} className="mt-4 grid gap-3 rounded-xl bg-slate-50 p-3 sm:grid-cols-[80px_1fr_80px_100px]"><select value={credit.type} onChange={(event) => setTranscript({ ...transcript, examCredits: transcript.examCredits.map((item) => item.id === credit.id ? { ...item, type: event.target.value as typeof credit.type } : item) })} className="field !py-2"><option>AP</option><option>IB</option><option>CLEP</option><option>Other</option></select><input value={credit.subject} onChange={(event) => setTranscript({ ...transcript, examCredits: transcript.examCredits.map((item) => item.id === credit.id ? { ...item, subject: event.target.value } : item) })} className="field !py-2" /><input aria-label="Exam score" value={credit.score} onChange={(event) => setTranscript({ ...transcript, examCredits: transcript.examCredits.map((item) => item.id === credit.id ? { ...item, score: event.target.value } : item) })} className="field !py-2" /><div className="field !py-2 text-center text-sm text-slate-600">{credit.creditsAwarded} est. cr.</div></div>)}
-            </div>
-          )}
-
-          <div className="flex flex-col-reverse justify-between gap-3 sm:flex-row sm:items-center"><button onClick={() => router.push("/onboarding")} className="secondary-button">Back</button><button onClick={continueToTargets} disabled={transcript.courses.length === 0} className="primary-button">Confirm transcript & continue <ArrowRight className="size-4" /></button></div>
-        </section>
-
-        <aside className="space-y-4">
-          <div className="card p-5"><p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Record snapshot</p><div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-1">
-            {[['Credits earned', earned.toString()], ['Current GPA', transcript.cumulativeGpa.toFixed(2)], ['Institutions', transcript.institutions.length.toString()], ['In progress', transcript.courses.filter((course) => course.status === "in-progress").reduce((sum, course) => sum + course.creditsAttempted, 0).toString()]].map(([label, value]) => <div key={label} className="rounded-xl bg-slate-50 p-3"><p className="text-[11px] text-slate-500">{label}</p><p className="mt-1 text-xl font-semibold tracking-tight text-[var(--ink)]">{value}</p></div>)}
-          </div></div>
-          <div className="card p-5"><h3 className="text-sm font-semibold text-slate-900">Review checklist</h3><div className="mt-3 space-y-2 text-xs text-slate-600">{["Institution names", "Course codes and titles", "Attempted and earned credits", "Grades and course status", "Low-confidence records"].map((item) => <div key={item} className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-teal-600" />{item}</div>)}</div></div>
-          <SampleDataBanner compact />
-        </aside>
+      <div className="mt-5 flex flex-col gap-3 rounded-2xl bg-[var(--ink)] p-4 text-white sm:flex-row sm:items-center sm:justify-between">
+        <div><p className="text-sm font-semibold">{transcript.courses.length} courses · {earned} earned credits</p><p className="mt-0.5 text-xs text-slate-300">You can edit this again from the planner.</p></div>
+        <button disabled={transcript.courses.length === 0} onClick={continueFlow} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--lime)] px-4 text-sm font-semibold text-[var(--ink)] disabled:opacity-50">Looks right — choose schools <ArrowRight className="size-4" /></button>
       </div>
     </main>
   );

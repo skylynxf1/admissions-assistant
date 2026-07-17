@@ -16,7 +16,9 @@ import type {
   RequirementResult,
   RequirementState,
   SchoolDefinition,
+  SimulationSummary,
   TranscriptData,
+  VerificationItem,
 } from "@/lib/types";
 import type {
   AcademicRecordNormalizer,
@@ -29,9 +31,27 @@ import type {
   ScenarioSimulator,
   TranscriptParser,
   UncertaintyEscalationHandler,
+  VerificationEvaluator,
 } from "@/lib/services/interfaces";
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const gradePoints: Record<string, number> = {
+  A: 4, "A-": 3.7, "B+": 3.3, B: 3, "B-": 2.7, "C+": 2.3, C: 2,
+  "C-": 1.7, "D+": 1.3, D: 1, F: 0,
+};
+
+function calculateProjectedGpa(transcript: TranscriptData) {
+  const graded = transcript.courses.filter((course) => course.status === "completed" && gradePoints[course.grade.toUpperCase()] !== undefined);
+  const qualityPoints = graded.reduce((sum, course) => sum + gradePoints[course.grade.toUpperCase()] * Math.max(course.creditsAttempted, 1), 0);
+  const gradedCredits = graded.reduce((sum, course) => sum + Math.max(course.creditsAttempted, 1), 0);
+  return gradedCredits ? Math.round((qualityPoints / gradedCredits) * 100) / 100 : transcript.cumulativeGpa;
+}
+
+function isPassing(course: CourseRecord) {
+  const points = gradePoints[course.grade.toUpperCase()];
+  return course.status === "completed" && (points === undefined || points >= 1.7);
+}
 
 function targetPairs(input: AcademicAnalysisInput) {
   return input.targets.flatMap((target) =>
@@ -40,7 +60,7 @@ function targetPairs(input: AcademicAnalysisInput) {
 }
 
 function calculateCreditSummary(input: AcademicAnalysisInput): CreditSummary {
-  const completed = input.transcript.courses.filter((course) => course.status === "completed");
+  const completed = input.transcript.courses.filter(isPassing);
   const earned = completed.reduce((sum, course) => sum + course.creditsEarned, 0);
   const attempted = input.transcript.courses.reduce((sum, course) => sum + course.creditsAttempted, 0);
   const inProgress = input.transcript.courses
@@ -49,8 +69,9 @@ function calculateCreditSummary(input: AcademicAnalysisInput): CreditSummary {
   const examCredits = input.scenario.useExamCredit
     ? input.transcript.examCredits.filter((credit) => credit.enabled).reduce((sum, credit) => sum + credit.creditsAwarded, 0)
     : 0;
+  const plannedCredits = input.scenario.plannedCourses.reduce((sum, course) => sum + course.credits, 0);
   const uncertainPenalty = completed.filter((course) => course.confidence !== "high").length * 1.5;
-  const estimatedTransferable = Math.round((earned + examCredits - uncertainPenalty) * 10) / 10;
+  const estimatedTransferable = Math.round((earned + inProgress * 0.85 + plannedCredits * 0.9 + examCredits - uncertainPenalty) * 10) / 10;
   const institutionPenalty = input.scenario.institutionType.includes("four-year") ? 6 : 3;
   const degreeApplicable = Math.max(0, estimatedTransferable - institutionPenalty);
   const majorApplicable = Math.max(0, Math.min(degreeApplicable, 25 + targetPairs(input).length * 2));
@@ -117,7 +138,7 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
         sourceCourse: "ENGL& 101",
         sourceInstitution: "Bellevue College",
         destinationSchoolId: "uw",
-        destinationCourse: "English composition credit",
+        destinationCourse: "No exact course number stored",
         category: "Writing",
         result: "Likely satisfies one composition requirement in this demo.",
         confidence: "high",
@@ -130,9 +151,9 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
         sourceCourse: "CS 141",
         sourceInstitution: "Bellevue College",
         destinationSchoolId: "uw",
-        destinationCourse: "Possible CSE 121 equivalent",
+        destinationCourse: "No verified course mapping",
         category: "Major prerequisite",
-        result: "General transfer credit is likely, but the department mapping is uncertain.",
+        result: "No course equivalency is stored; department evaluation is required.",
         confidence: "medium",
         reasoning: "The sample public mapping does not resolve the department-level prerequisite use.",
         confirmationRecommended: true,
@@ -143,9 +164,9 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
         sourceCourse: "MATH& 151",
         sourceInstitution: "Bellevue College",
         destinationSchoolId: "berkeley",
-        destinationCourse: "Possible MATH 1A articulation",
+        destinationCourse: "No verified course mapping",
         category: "Quantitative / major prerequisite",
-        result: "Likely transferable; exact major applicability needs confirmation.",
+        result: "No course equivalency is stored; transfer and major applicability are unresolved.",
         confidence: "medium",
         reasoning: "This demo does not contain an official cross-state articulation agreement.",
         confirmationRecommended: true,
@@ -156,9 +177,9 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
         sourceCourse: "ECON& 201",
         sourceInstitution: "Bellevue College",
         destinationSchoolId: "berkeley",
-        destinationCourse: "Lower-division economics credit",
+        destinationCourse: "No verified course mapping",
         category: "Social science",
-        result: "Estimated to satisfy lower-division social science credit.",
+        result: "No exact transfer-credit or requirement result is stored.",
         confidence: "medium",
         reasoning: "Subject area aligns; direct articulation is not present in the sample dataset.",
         confirmationRecommended: true,
@@ -169,9 +190,9 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
         sourceCourse: "SOCW 2010",
         sourceInstitution: "Seattle University",
         destinationSchoolId: "ucla",
-        destinationCourse: "General social science elective",
+        destinationCourse: "No verified course mapping",
         category: "Social science / diversity",
-        result: "May transfer as elective credit; category use is unclear.",
+        result: "No exact transfer-credit or requirement result is stored.",
         confidence: "low",
         reasoning: "No direct fictional equivalency is available for this private-school course.",
         confirmationRecommended: true,
@@ -180,6 +201,134 @@ export class MockEquivalencyAnalyzer implements EquivalencyAnalyzer {
     ];
 
     return templates.filter((item) => selectedSchools.has(item.destinationSchoolId));
+  }
+}
+
+// MOCK IMPLEMENTATION: every conclusion is limited to an explicit saved sample record.
+// A destination course is never inferred when the stored sources do not name one.
+export class MockVerificationEvaluator implements VerificationEvaluator {
+  async evaluate(input: AcademicAnalysisInput, equivalencies: CourseEquivalency[]): Promise<VerificationItem[]> {
+    const selectedSchools = new Set(input.targets.map((target) => target.schoolId));
+    const course = (code: string, institution?: string) => input.transcript.courses.find(
+      (item) => item.code.toUpperCase() === code.toUpperCase()
+        && (!institution || item.institution === institution),
+    );
+    const buildContext = (code: string, institution?: string) => {
+      const match = course(code, institution);
+      return {
+        sourceCourse: match?.code ?? code,
+        sourceInstitution: match?.institution ?? institution ?? input.scenario.currentInstitution,
+        sourceTerm: match?.term ?? "Term not found in reviewed record",
+      };
+    };
+    const storedDestination = (id: string) => {
+      const match = equivalencies.find((item) => item.id === id);
+      return match && !match.destinationCourse.startsWith("No ") ? match.destinationCourse : undefined;
+    };
+
+    const items: VerificationItem[] = [];
+    if (selectedSchools.has("uw")) {
+      items.push(
+        {
+          id: "verify-math151-uw",
+          status: "confirmed",
+          title: "Calculus mapping is present in the saved record",
+          conclusion: "The saved sample equivalency record explicitly maps this course to UW MATH 124.",
+          explanation: "Confirmed means the exact mapping exists in the currently saved source record. The record is still sample, unverified demo data—not live official guidance.",
+          ...buildContext("MATH& 151", "Bellevue College"),
+          destinationSchoolId: "uw",
+          destinationCourse: storedDestination("eq-math151-uw"),
+          question: "Does MATH& 151 from Bellevue College satisfy UW MATH 124 for my selected transfer major?",
+          office: "Transfer credit office",
+          sourceChecks: [{ citationId: "uw-equivalency", outcome: "supports", note: "The saved sample table contains the exact MATH& 151 to MATH 124 mapping." }],
+          canDraftEmail: false,
+        },
+        {
+          id: "verify-engl101-uw",
+          status: "likely",
+          title: "Composition category appears supported",
+          conclusion: "The saved writing policy appears to support composition credit, but it does not store an exact UW course number.",
+          explanation: "The category rule and transcript subject align. Because no direct course-to-course mapping is saved, the system does not name one.",
+          ...buildContext("ENGL& 101", "Bellevue College"),
+          destinationSchoolId: "uw",
+          question: "Will ENGL& 101 from Bellevue College satisfy the composition requirement for my selected UW transfer major?",
+          office: "Admissions",
+          sourceChecks: [{ citationId: "uw-transfer", outcome: "supports", note: "The saved policy describes composition credit, but not an exact destination course number." }],
+          canDraftEmail: true,
+        },
+        {
+          id: "verify-cs141-uw",
+          status: "manual-evaluation",
+          title: "Programming course needs department review",
+          conclusion: "No UW course equivalency is stored for CS 141. A department must evaluate it before it is used as a major prerequisite.",
+          explanation: "The equivalency guide does not resolve this course, while the major policy only identifies the prerequisite area. A syllabus-level evaluation is required.",
+          ...buildContext("CS 141", "Bellevue College"),
+          destinationSchoolId: "uw",
+          question: "Does CS 141 (Computer Science I) from Bellevue College satisfy the introductory programming prerequisite for my selected UW major, or only transfer as elective credit?",
+          office: "Department advisor",
+          sourceChecks: [
+            { citationId: "uw-equivalency", outcome: "does-not-address", note: "No exact CS 141 destination mapping is present in the saved equivalency record." },
+            { citationId: "uw-info", outcome: "does-not-address", note: "The major record describes the prerequisite but does not evaluate this source course." },
+          ],
+          canDraftEmail: true,
+        },
+      );
+    }
+
+    if (selectedSchools.has("berkeley")) {
+      items.push(
+        {
+          id: "verify-econ201-berkeley",
+          status: "unclear",
+          title: "Economics course use is not documented",
+          conclusion: "The checked sources do not provide an exact Berkeley equivalency or a major-applicability decision.",
+          explanation: "Subject similarity is not enough to establish transfer or requirement credit, so no destination course has been assigned.",
+          ...buildContext("ECON& 201", "Bellevue College"),
+          destinationSchoolId: "berkeley",
+          question: "How would ECON& 201 from Bellevue College be evaluated for transfer credit and for my selected UC Berkeley major?",
+          office: "Transfer credit office",
+          sourceChecks: [
+            { citationId: "berkeley-transfer", outcome: "does-not-address", note: "The saved transfer policy is general and does not list this course." },
+            { citationId: "berkeley-data", outcome: "does-not-address", note: "The saved major record does not identify this source course." },
+          ],
+          canDraftEmail: true,
+        },
+        {
+          id: "verify-math151-berkeley",
+          status: "conflicting",
+          title: "General transfer and major-use signals differ",
+          conclusion: "One saved record supports possible general transferability, while the major record does not confirm prerequisite use.",
+          explanation: "These records answer different questions and cannot be reconciled into a direct equivalency. No Berkeley course number has been assigned.",
+          ...buildContext("MATH& 151", "Bellevue College"),
+          destinationSchoolId: "berkeley",
+          question: "Can MATH& 151 from Bellevue College satisfy the calculus prerequisite for my selected UC Berkeley major, and if not, how will it transfer?",
+          office: "Department advisor",
+          sourceChecks: [
+            { citationId: "berkeley-transfer", outcome: "supports", note: "The general transfer record supports review for transferable quantitative credit." },
+            { citationId: "berkeley-data", outcome: "conflicts", note: "The major record does not confirm that this course satisfies the calculus prerequisite." },
+          ],
+          canDraftEmail: true,
+        },
+      );
+    }
+
+    if (selectedSchools.has("ucla")) {
+      items.push({
+        id: "verify-socw-ucla",
+        status: "manual-evaluation",
+        title: "Private-university course needs manual evaluation",
+        conclusion: "No UCLA equivalency is stored for this course.",
+        explanation: "The saved source contains no direct mapping for this institution and course. The system leaves the destination course blank.",
+        ...buildContext("SOCW 2010", "Seattle University"),
+        destinationSchoolId: "ucla",
+        question: "How will SOCW 2010 from Seattle University be evaluated for UCLA transfer credit and requirement applicability?",
+        office: "Transfer credit office",
+        sourceChecks: [{ citationId: "ucla-transfer", outcome: "does-not-address", note: "The saved transfer policy does not list this exact course." }],
+        canDraftEmail: true,
+      });
+    }
+
+    return items;
   }
 }
 
@@ -192,9 +341,18 @@ function requirementState(complete: boolean, uncertain = false): RequirementStat
 export class MockRequirementEvaluator implements RequirementEvaluator {
   async evaluate(input: AcademicAnalysisInput, equivalencies: CourseEquivalency[]): Promise<RequirementResult[]> {
     const credits = calculateCreditSummary(input);
-    const completedCodes = new Set(
-      input.transcript.courses.filter((course) => course.status === "completed").map((course) => course.code),
-    );
+    const completedCodes = new Set(input.transcript.courses.filter(isPassing).map((course) => course.code.toUpperCase()));
+    const plannedCodes = new Set([
+      ...input.transcript.courses.filter((course) => course.status === "in-progress").map((course) => course.code.toUpperCase()),
+      ...input.scenario.plannedCourses.map((course) => course.course.toUpperCase()),
+    ]);
+    const hasCompleted = (code: string) => completedCodes.has(code.toUpperCase());
+    const hasPlanned = (code: string) => plannedCodes.has(code.toUpperCase());
+    const stateFor = (codes: string[]): RequirementState => codes.every(hasCompleted)
+      ? "complete"
+      : codes.every((code) => hasCompleted(code) || hasPlanned(code))
+        ? "in-progress"
+        : "missing";
 
     return targetPairs(input).flatMap(({ schoolId, majorId }) => {
       const school = getSchool(schoolId);
@@ -211,27 +369,39 @@ export class MockRequirementEvaluator implements RequirementEvaluator {
         },
         {
           id: `${majorId}-writing`, schoolId, majorId, category: "General education", title: "College composition",
-          state: requirementState(completedCodes.has("ENGL& 101")), completedCredits: completedCodes.has("ENGL& 101") ? 5 : 0, requiredCredits: 5,
-          matchedCourses: completedCodes.has("ENGL& 101") ? ["ENGL& 101"] : [], missingCourses: completedCodes.has("ENGL& 101") ? [] : ["College composition"],
+          state: stateFor(["ENGL& 101"]), completedCredits: hasCompleted("ENGL& 101") ? 5 : hasPlanned("ENGL& 101") || hasPlanned("ENGL& 102") ? 2.5 : 0, requiredCredits: 5,
+          matchedCourses: hasCompleted("ENGL& 101") ? ["ENGL& 101"] : hasPlanned("ENGL& 102") ? ["ENGL& 102 (planned)"] : [], missingCourses: hasCompleted("ENGL& 101") || hasPlanned("ENGL& 102") ? [] : ["College composition"],
           confidence: schoolId === "uw" ? "high" : "medium", citationIds: [schoolId === "uw" ? "uw-transfer" : schoolId === "berkeley" ? "berkeley-transfer" : "ucla-transfer"],
         },
         {
+          id: `${majorId}-communication`, schoolId, majorId, category: "General education", title: "Oral communication",
+          state: stateFor(["CMST& 220"]), completedCredits: hasCompleted("CMST& 220") ? 5 : hasPlanned("CMST& 220") ? 2.5 : 0, requiredCredits: 5,
+          matchedCourses: hasCompleted("CMST& 220") ? ["CMST& 220"] : [], missingCourses: hasCompleted("CMST& 220") || hasPlanned("CMST& 220") ? [] : ["Public speaking"],
+          confidence: "medium", citationIds: [schoolId === "uw" ? "uw-transfer" : schoolId === "berkeley" ? "berkeley-transfer" : "ucla-transfer"],
+        },
+        {
+          id: `${majorId}-science`, schoolId, majorId, category: "General education", title: "Natural or lab science",
+          state: stateFor(["PHYS& 114"]), completedCredits: hasCompleted("PHYS& 114") ? 5 : hasPlanned("PHYS& 114") ? 2.5 : 0, requiredCredits: 5,
+          matchedCourses: hasCompleted("PHYS& 114") ? ["PHYS& 114"] : hasPlanned("PHYS& 114") ? ["PHYS& 114 (planned)"] : [], missingCourses: hasCompleted("PHYS& 114") || hasPlanned("PHYS& 114") ? [] : ["Lab science"],
+          confidence: "medium", citationIds: [schoolId === "uw" ? "uw-transfer" : schoolId === "berkeley" ? "berkeley-transfer" : "ucla-transfer"],
+        },
+        {
           id: `${majorId}-calculus`, schoolId, majorId, category: "Major prerequisite", title: "Calculus sequence",
-          state: requirementState(completedCodes.has("MATH& 151") && completedCodes.has("MATH& 152"), schoolId !== "uw"),
-          completedCredits: completedCodes.has("MATH& 151") && completedCodes.has("MATH& 152") ? 10 : completedCodes.has("MATH& 151") ? 5 : 0,
-          requiredCredits: 10, matchedCourses: ["MATH& 151", "MATH& 152"].filter((code) => completedCodes.has(code)),
-          missingCourses: completedCodes.has("MATH& 152") ? [] : ["Calculus II"], confidence: schoolId === "uw" ? "high" : "medium",
+          state: stateFor(["MATH& 151", "MATH& 152"]),
+          completedCredits: ["MATH& 151", "MATH& 152"].reduce((sum, code) => sum + (hasCompleted(code) ? 5 : hasPlanned(code) ? 2.5 : 0), 0),
+          requiredCredits: 10, matchedCourses: ["MATH& 151", "MATH& 152"].filter((code) => hasCompleted(code) || hasPlanned(code)),
+          missingCourses: ["MATH& 151", "MATH& 152"].filter((code) => !hasCompleted(code) && !hasPlanned(code)), confidence: schoolId === "uw" ? "high" : "medium",
           citationIds: [schoolId === "uw" ? "uw-equivalency" : schoolId === "berkeley" ? "berkeley-data" : "ucla-transfer"],
         },
         {
           id: `${majorId}-programming`, schoolId, majorId, category: "Major prerequisite", title: "Programming sequence",
-          state: programmingUncertain ? "uncertain" : "in-progress", completedCredits: completedCodes.has("CS 141") ? 5 : 0, requiredCredits: 10,
-          matchedCourses: completedCodes.has("CS 141") ? ["CS 141"] : [], missingCourses: ["Data Structures"], confidence: programmingUncertain ? "medium" : "high",
+          state: programmingUncertain ? "uncertain" : stateFor(["CS 141", "CS 210"]), completedCredits: (hasCompleted("CS 141") ? 5 : hasPlanned("CS 141") ? 2.5 : 0) + (hasCompleted("CS 210") ? 5 : hasPlanned("CS 210") ? 2.5 : 0), requiredCredits: 10,
+          matchedCourses: ["CS 141", "CS 210"].filter((code) => hasCompleted(code) || hasPlanned(code)), missingCourses: hasCompleted("CS 210") || hasPlanned("CS 210") ? [] : ["Data Structures"], confidence: programmingUncertain ? "medium" : "high",
           citationIds: schoolId === "uw" ? ["uw-equivalency", "uw-info"] : [schoolId === "berkeley" ? "berkeley-data" : "ucla-transfer"],
         },
         {
           id: `${majorId}-statistics`, schoolId, majorId, category: "Major prerequisite", title: "Statistics or probability",
-          state: "missing", completedCredits: 0, requiredCredits: 5, matchedCourses: [], missingCourses: ["Introductory Statistics"], confidence: "medium",
+          state: stateFor(["MATH& 146"]), completedCredits: hasCompleted("MATH& 146") ? 5 : hasPlanned("MATH& 146") ? 2.5 : 0, requiredCredits: 5, matchedCourses: hasCompleted("MATH& 146") || hasPlanned("MATH& 146") ? ["MATH& 146"] : [], missingCourses: hasCompleted("MATH& 146") || hasPlanned("MATH& 146") ? [] : ["Introductory Statistics"], confidence: "medium",
           citationIds: [schoolId === "uw" ? "uw-info" : schoolId === "berkeley" ? "berkeley-data" : "ucla-transfer"],
         },
       ] satisfies RequirementResult[];
@@ -242,6 +412,13 @@ export class MockRequirementEvaluator implements RequirementEvaluator {
 // MOCK IMPLEMENTATION: production graph should be constructed from term-aware prerequisite policies.
 export class MockPrerequisiteGraphService implements PrerequisiteGraphService {
   async build(input: AcademicAnalysisInput): Promise<PrerequisiteChain[]> {
+    const completedCodes = new Set(input.transcript.courses.filter(isPassing).map((course) => course.code.toUpperCase()));
+    const inProgressCodes = new Set([
+      ...input.transcript.courses.filter((course) => course.status === "in-progress").map((course) => course.code.toUpperCase()),
+      ...input.scenario.plannedCourses.map((course) => course.course.toUpperCase()),
+    ]);
+    const stateFor = (code: string): RequirementState => completedCodes.has(code) ? "complete" : inProgressCodes.has(code) ? "in-progress" : "missing";
+    const plannedTerm = (code: string, fallback: string) => input.scenario.plannedCourses.find((course) => course.course.toUpperCase() === code)?.termLabel ?? fallback;
     return targetPairs(input)
       .filter(({ majorId }) => /computer|informatics|data|statistics/.test(majorId))
       .map(({ schoolId, majorId }) => ({
@@ -253,9 +430,9 @@ export class MockPrerequisiteGraphService implements PrerequisiteGraphService {
         confidence: schoolId === "uw" ? "medium" : "low",
         citationIds: [schoolId === "uw" ? "uw-info" : schoolId === "berkeley" ? "berkeley-data" : "ucla-transfer"],
         steps: [
-          { course: "CS 141", title: "Computer Science I", state: "complete", earliestTerm: "Completed", minimumGrade: "2.0 / C" },
-          { course: "CS 142", title: "Computer Science II", state: "in-progress", earliestTerm: "Winter 2026", minimumGrade: "2.0 / C" },
-          { course: "CS 210", title: "Data Structures", state: "missing", earliestTerm: "Spring 2026", minimumGrade: "2.0 / C" },
+          { course: "CS 141", title: "Computer Science I", state: stateFor("CS 141"), earliestTerm: completedCodes.has("CS 141") ? "Completed" : plannedTerm("CS 141", "Next available term"), minimumGrade: "2.0 / C" },
+          { course: "CS 142", title: "Computer Science II", state: stateFor("CS 142"), earliestTerm: plannedTerm("CS 142", "Winter 2026"), minimumGrade: "2.0 / C" },
+          { course: "CS 210", title: "Data Structures", state: stateFor("CS 210"), earliestTerm: plannedTerm("CS 210", "After CS 142"), minimumGrade: "2.0 / C" },
         ],
       }));
   }
@@ -319,16 +496,84 @@ function buildReadiness(input: AcademicAnalysisInput, requirements: RequirementR
     const school = getSchool(schoolId);
     const pathwayBoost = input.scenario.institutionType === "in-state-community-college" && schoolId === "uw" ? 5 : 0;
     const residencyBoost = input.scenario.residency === "in-state" && schoolId === "uw" ? 2 : 0;
-    const rawScore = (complete / Math.max(programRequirements.length, 1)) * 75 + inProgress * 6 + pathwayBoost + residencyBoost - uncertain * 2;
+    const projectedGpa = calculateProjectedGpa(input.transcript);
+    const gpaMinimumMet = projectedGpa >= 3;
+    const rawScore = (complete / Math.max(programRequirements.length, 1)) * 75 + inProgress * 6 + pathwayBoost + residencyBoost - uncertain * 2 + (gpaMinimumMet ? 2 : -8);
     const score = Math.round(clamp(rawScore, 24, 94));
     const creditMinimumMet = credits.estimatedTransferable >= (school?.minimumTransferCredits ?? 60);
-    const status = !creditMinimumMet ? "not-eligible" : uncertain > 1 ? "manual-confirmation" : score >= 80 ? "ready" : score >= 60 ? "nearly-ready" : "preparation-recommended";
+    const status = !creditMinimumMet || !gpaMinimumMet ? "not-eligible" : uncertain > 1 ? "manual-confirmation" : score >= 80 ? "ready" : score >= 60 ? "nearly-ready" : "preparation-recommended";
     return {
       schoolId, majorId, score, status, completedPrerequisites: complete, totalPrerequisites: programRequirements.length,
-      creditMinimumMet, gpaMinimumMet: input.transcript.cumulativeGpa >= 3, earliestApplicationTerm: creditMinimumMet ? input.scenario.targetTransferTerm : "After one additional term",
+      creditMinimumMet, gpaMinimumMet, earliestApplicationTerm: creditMinimumMet ? input.scenario.targetTransferTerm : "After one additional term",
       unresolvedQuestions: uncertain,
     };
   });
+}
+
+const academicTerms = ["Winter", "Spring", "Summer", "Fall"] as const;
+
+function parseTerm(value: string) {
+  const [season = "Fall", yearText = "2027"] = value.split(" ");
+  return { season: academicTerms.includes(season as typeof academicTerms[number]) ? season as typeof academicTerms[number] : "Fall", year: Number(yearText) || 2027 };
+}
+
+function nextAcademicTerm(value: string, attendSummer: boolean) {
+  const { season, year } = parseTerm(value);
+  const available: readonly string[] = attendSummer ? academicTerms : academicTerms.filter((term) => term !== "Summer");
+  const currentIndex = available.indexOf(season);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % available.length : 0;
+  const nextSeason = available[nextIndex];
+  const nextYear = nextSeason === "Winter" && season !== "Winter" ? year + 1 : year;
+  return `${nextSeason} ${nextYear}`;
+}
+
+function estimateGraduationTerm(startTerm: string, termsRemaining: number, attendSummer: boolean) {
+  let term = startTerm;
+  for (let index = 1; index < Math.max(termsRemaining, 1); index += 1) term = nextAcademicTerm(term, attendSummer);
+  return term;
+}
+
+function termOrdinal(value: string) {
+  const { season, year } = parseTerm(value);
+  return year * 4 + academicTerms.indexOf(season);
+}
+
+function buildSimulationSummary(
+  input: AcademicAnalysisInput,
+  requirements: RequirementResult[],
+  readiness: ProgramReadiness[],
+  credits: CreditSummary,
+): SimulationSummary {
+  const generalEducation = requirements.filter((requirement) => requirement.category === "General education");
+  const generalEducationRequired = generalEducation.reduce((sum, requirement) => sum + requirement.requiredCredits, 0);
+  const generalEducationCompleted = generalEducation.reduce((sum, requirement) => sum + requirement.completedCredits, 0);
+  const plannedCredits = input.scenario.plannedCourses.reduce((sum, course) => sum + course.credits, 0);
+  const estimatedRemainingCredits = Math.max(0, Math.ceil(180 - credits.degreeApplicable));
+  const termsRemaining = Math.ceil(estimatedRemainingCredits / Math.max(input.scenario.preferredCreditLoad, 1));
+  const estimatedGraduationTerm = estimateGraduationTerm(input.scenario.targetTransferTerm, termsRemaining, input.scenario.attendSummer);
+  const termLoads = input.scenario.plannedCourses.reduce<Record<string, number>>((totals, course) => ({ ...totals, [course.termId]: (totals[course.termId] ?? 0) + course.credits }), {});
+  const missingPrerequisites = new Set(requirements
+    .filter((requirement) => requirement.category === "Major prerequisite" && (requirement.state === "missing" || requirement.state === "uncertain"))
+    .map((requirement) => `${requirement.schoolId}:${requirement.title}`));
+  const openOptionIds = readiness.filter((program) => program.status !== "not-eligible").map((program) => program.majorId);
+
+  return {
+    totalPrograms: readiness.length,
+    transferEligiblePrograms: readiness.filter((program) => program.creditMinimumMet).length,
+    majorEligiblePrograms: readiness.filter((program) => program.status === "ready" || program.status === "nearly-ready").length,
+    missingPrerequisiteCount: missingPrerequisites.size,
+    generalEducationPercent: generalEducationRequired ? Math.round((generalEducationCompleted / generalEducationRequired) * 100) : 0,
+    plannedCredits,
+    projectedTransferableCredits: credits.estimatedTransferable,
+    estimatedRemainingCredits,
+    estimatedGraduationTerm,
+    graduationTarget: input.scenario.graduationTarget,
+    onTrackForGraduationTarget: termOrdinal(estimatedGraduationTerm) <= termOrdinal(input.scenario.graduationTarget),
+    termsRemaining,
+    openOptionIds,
+    projectedGpa: calculateProjectedGpa(input.transcript),
+    overloadedTermIds: Object.entries(termLoads).filter(([, total]) => total > input.scenario.preferredCreditLoad).map(([termId]) => termId),
+  };
 }
 
 function buildAlerts(input: AcademicAnalysisInput, credits: CreditSummary, equivalencies: CourseEquivalency[]): AnalysisAlert[] {
@@ -351,7 +596,7 @@ function buildAlerts(input: AcademicAnalysisInput, credits: CreditSummary, equiv
   if (uncertainProgramming) {
     alerts.push({
       id: "alert-cs-equivalency", severity: "critical", title: "Programming equivalency needs confirmation",
-      message: `${uncertainProgramming.sourceCourse} likely transfers, but its use as a direct major prerequisite is not established in the sample policy set.`,
+      message: `${uncertainProgramming.sourceCourse} has no stored destination-course mapping, so its transfer and prerequisite use require manual confirmation.`,
       confidence: "medium", office: "Department advisor", canDraftEmail: true, citationIds: uncertainProgramming.citationIds,
     });
   }
@@ -372,6 +617,7 @@ export class MockScenarioSimulator implements ScenarioSimulator {
   constructor(
     private readonly policyRetrieval: PolicyRetrievalService,
     private readonly equivalencyAnalyzer: EquivalencyAnalyzer,
+    private readonly verificationEvaluator: VerificationEvaluator,
     private readonly requirementEvaluator: RequirementEvaluator,
     private readonly prerequisiteGraph: PrerequisiteGraphService,
     private readonly recommendationEngine: CourseRecommendationEngine,
@@ -384,19 +630,23 @@ export class MockScenarioSimulator implements ScenarioSimulator {
       this.prerequisiteGraph.build(input),
     ]);
     const requirements = await this.requirementEvaluator.evaluate(input, equivalencies);
+    const verifications = await this.verificationEvaluator.evaluate(input, equivalencies);
     const recommendations = await this.recommendationEngine.recommend(input, requirements);
     const creditSummary = calculateCreditSummary(input);
+    const readiness = buildReadiness(input, requirements, creditSummary);
     return {
       generatedAt: new Date().toISOString(),
       dataMode: "sample",
-      scenarioLabel: `${input.scenario.residency === "in-state" ? "In-state" : input.scenario.residency === "out-of-state" ? "Out-of-state" : "International"} · ${input.scenario.preferredCreditLoad} credits · ${input.scenario.useExamCredit ? "AP/IB on" : "AP/IB off"}`,
+      scenarioLabel: `${input.scenario.currentInstitution} · ${input.scenario.residency === "in-state" ? "In-state" : input.scenario.residency === "out-of-state" ? "Out-of-state" : "International"} · ${input.scenario.preferredCreditLoad} credits max · ${input.scenario.useExamCredit ? "AP/IB on" : "AP/IB off"}`,
+      simulationSummary: buildSimulationSummary(input, requirements, readiness, creditSummary),
       creditSummary,
-      readiness: buildReadiness(input, requirements, creditSummary),
+      readiness,
       requirements,
       equivalencies,
       prerequisiteChains,
       recommendations,
       alerts: buildAlerts(input, creditSummary, equivalencies),
+      verifications,
       citations: sampleCitations.filter((citation) => input.targets.some((target) => citation.id.startsWith(`${target.schoolId}-`))),
     };
   }
@@ -418,6 +668,10 @@ export class MockAdvisorChatService implements AdvisorChatService {
         ? `${top.course} — ${top.title} is the strongest option-preserving next course in this scenario. It supports ${top.optionCount} selected program options and addresses ${top.satisfies.join(" and ")}. ${top.whyNow}`
         : "Add at least one target major so I can compare option-preserving courses.";
       citationIds = top?.citationIds.slice(0, 2) ?? [];
+    } else if (question.includes("graduat") || question.includes("remaining") || question.includes("timeline")) {
+      const summary = input.analysis.simulationSummary;
+      content = `This scenario estimates ${summary.estimatedRemainingCredits} credits and about ${summary.termsRemaining} terms remaining, with an estimated graduation term of ${summary.estimatedGraduationTerm}. That is ${summary.onTrackForGraduationTarget ? "on track for" : "later than"} the selected ${summary.graduationTarget} target. The estimate assumes a maximum of ${input.scenario.preferredCreditLoad} credits per term${input.scenario.attendSummer ? " and includes summer study" : " without summer study"}.`;
+      citationIds = input.analysis.citations.slice(0, 2).map((citation) => citation.id);
     } else if (question.includes("transfer") || question.includes("eligible") || question.includes("apply")) {
       const readyCount = input.analysis.readiness.filter((item) => item.creditMinimumMet).length;
       content = `You currently have ${credits.earned} earned college credits and about ${credits.estimatedTransferable} estimated transferable credits in the sample model. ${readyCount} of ${input.analysis.readiness.length} selected programs meet their sample credit minimum now; in-progress work may move the others into range. This is readiness guidance, not an admission prediction.`;
@@ -436,7 +690,8 @@ export class MockAdvisorChatService implements AdvisorChatService {
         citationIds,
       },
       assumptions: [
-        `Preferred load remains ${input.scenario.preferredCreditLoad} credits.`,
+        `Maximum load remains ${input.scenario.preferredCreditLoad} credits per term.`,
+        `Current school is ${input.scenario.currentInstitution}.`,
         `The transcript contains ${input.transcript.courses.length} reviewed course records.`,
         "No selected program policy has been independently verified in this demo.",
       ],
@@ -447,14 +702,24 @@ export class MockAdvisorChatService implements AdvisorChatService {
 
 // MOCK IMPLEMENTATION: email text should later include the exact retrieved policy gap and destination address.
 export class MockUncertaintyEscalationHandler implements UncertaintyEscalationHandler {
-  async draftEmail(alert: AnalysisAlert, input: AcademicAnalysisInput): Promise<DraftEmail> {
+  async draftEmail(item: VerificationItem, input: AcademicAnalysisInput): Promise<DraftEmail> {
     const selectedPrograms = targetPairs(input)
       .map(({ schoolId, majorId }) => `${getSchool(schoolId)?.shortName ?? schoolId} ${getMajor(majorId)?.name ?? majorId}`)
       .join(", ");
+    const sourceSummary = item.sourceChecks.map((check) => {
+      const citation = sampleCitations.find((candidate) => candidate.id === check.citationId);
+      return `- ${citation?.title ?? check.citationId}: ${check.note}`;
+    }).join("\n");
     return {
-      toOffice: alert.office,
-      subject: `Transfer planning question: ${alert.title}`,
-      body: `Hello,\n\nI am planning to apply as a transfer student for ${selectedPrograms}. I completed CS 141 (Computer Science I) at Bellevue College and would like to confirm whether it satisfies the introductory programming prerequisite for admission to the program, or whether it transfers only as general elective credit.\n\nI am targeting ${input.scenario.targetTransferTerm} and currently attend ${input.profile.currentInstitution}. Could you also let me know whether a syllabus or course description is required for review?\n\nThank you for your help.`,
+      toOffice: item.office,
+      subject: `Transfer evaluation request: ${item.sourceCourse} from ${item.sourceInstitution}`,
+      body: `Hello,\n\nI am requesting guidance about ${item.sourceCourse}, taken at ${item.sourceInstitution} in ${item.sourceTerm}. I am planning for ${selectedPrograms || getSchool(item.destinationSchoolId)?.shortName || item.destinationSchoolId} and targeting ${input.scenario.targetTransferTerm}.\n\nMy exact question is:\n${item.question}\n\nThe saved sources I checked were:\n${sourceSummary}\n\nThe planning tool did not assign an equivalency that was not explicitly present in those records. Could your office confirm the result and let me know whether you need a syllabus or course description for manual evaluation?\n\nThank you for your help.`,
+      context: {
+        course: item.sourceCourse,
+        institution: item.sourceInstitution,
+        term: item.sourceTerm,
+        question: item.question,
+      },
     };
   }
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { defaultTargets } from "@/data/sample-policies";
 import { createSampleTranscript } from "@/data/sample-transcript";
 import { academicPlanningServices } from "@/lib/services";
 import type {
@@ -27,12 +26,15 @@ const defaultProfile: StudentProfile = {
 };
 
 const defaultScenario: ScenarioSettings = {
+  currentInstitution: defaultProfile.currentInstitution,
   institutionType: defaultProfile.institutionType,
   residency: defaultProfile.residency,
   targetTransferTerm: defaultProfile.targetTransferTerm,
   preferredCreditLoad: defaultProfile.preferredCreditLoad,
+  graduationTarget: "Spring 2030",
   useExamCredit: true,
   attendSummer: false,
+  plannedCourses: [],
 };
 
 interface PersistedState {
@@ -40,6 +42,7 @@ interface PersistedState {
   profile: StudentProfile;
   transcript: TranscriptData;
   targets: TargetSchool[];
+  prioritySchoolId: string;
   scenario: ScenarioSettings;
 }
 
@@ -51,6 +54,7 @@ interface AppContextValue extends PersistedState {
   setProfile: (profile: StudentProfile) => void;
   setTranscript: (transcript: TranscriptData) => void;
   setTargets: (targets: TargetSchool[]) => void;
+  setPrioritySchoolId: (schoolId: string) => void;
   setScenario: (scenario: ScenarioSettings) => void;
   updateScenario: (updates: Partial<ScenarioSettings>) => void;
   rerunAnalysis: () => Promise<void>;
@@ -58,13 +62,17 @@ interface AppContextValue extends PersistedState {
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
-const STORAGE_KEY = "pathwise-prototype-state-v1";
+const STORAGE_KEY = "pathwise-prototype-state-v3";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<PlanningMode>("transfer");
   const [profile, setProfileState] = useState<StudentProfile>(defaultProfile);
   const [transcript, setTranscript] = useState<TranscriptData>(() => createSampleTranscript());
-  const [targets, setTargets] = useState<TargetSchool[]>(defaultTargets);
+  const [targets, setTargets] = useState<TargetSchool[]>([
+    { schoolId: "uw", majorIds: [] },
+    { schoolId: "berkeley", majorIds: [] },
+  ]);
+  const [prioritySchoolId, setPrioritySchoolId] = useState("uw");
   const [scenario, setScenario] = useState<ScenarioSettings>(defaultScenario);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<AppContextValue["analysisStatus"]>("idle");
@@ -72,7 +80,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     {
       id: "advisor-welcome",
       role: "assistant",
-      content: "I’m ready to reason over your reviewed transcript and selected programs. Ask about transfer timing, course choices, or an uncertain policy. My answers use sample, unverified policy data in this prototype.",
+      content: "Ask me about your courses, requirements, or transfer path. I’ll answer only from your reviewed transcript and the policy records saved in this plan.",
       createdAt: new Date(0).toISOString(),
       confidence: "medium",
       citationIds: [],
@@ -89,7 +97,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setProfileState(parsed.profile);
         setTranscript(parsed.transcript);
         setTargets(parsed.targets);
-        setScenario(parsed.scenario);
+        setPrioritySchoolId(parsed.prioritySchoolId || parsed.targets[0]?.schoolId || "uw");
+        setScenario({ ...defaultScenario, ...parsed.scenario, plannedCourses: parsed.scenario?.plannedCourses ?? [] });
       }
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
@@ -100,8 +109,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode, profile, transcript, targets, scenario }));
-  }, [hydrated, mode, profile, transcript, targets, scenario]);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode, profile, transcript, targets, prioritySchoolId, scenario }));
+  }, [hydrated, mode, profile, transcript, targets, prioritySchoolId, scenario]);
 
   const analysisInput = useMemo<AcademicAnalysisInput>(
     () => ({ profile, transcript, targets, scenario }),
@@ -133,6 +142,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setProfileState(nextProfile);
     setScenario((current) => ({
       ...current,
+      currentInstitution: nextProfile.currentInstitution,
       institutionType: nextProfile.institutionType,
       residency: nextProfile.residency,
       targetTransferTerm: nextProfile.targetTransferTerm,
@@ -147,10 +157,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AppContextValue>(
     () => ({
-      mode, profile, transcript, targets, scenario, analysis, analysisStatus, advisorMessages,
-      setMode, setProfile, setTranscript, setTargets, setScenario, updateScenario, rerunAnalysis, setAdvisorMessages,
+      mode, profile, transcript, targets, prioritySchoolId, scenario, analysis, analysisStatus, advisorMessages,
+      setMode, setProfile, setTranscript, setTargets, setPrioritySchoolId, setScenario, updateScenario, rerunAnalysis, setAdvisorMessages,
     }),
-    [mode, profile, transcript, targets, scenario, analysis, analysisStatus, advisorMessages, setProfile, updateScenario, rerunAnalysis],
+    [mode, profile, transcript, targets, prioritySchoolId, scenario, analysis, analysisStatus, advisorMessages, setProfile, updateScenario, rerunAnalysis],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
