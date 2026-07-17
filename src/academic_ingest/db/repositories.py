@@ -158,6 +158,7 @@ class VersionRepository:
         canonical_key: str,
         payload: dict[str, Any],
         evidence_record_ids: list[UUID] | None = None,
+        commit: bool = True,
     ) -> RecordVersionModel:
         canonical_payload = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
         content_hash = _sha256(canonical_payload.encode())
@@ -186,7 +187,10 @@ class VersionRepository:
             superseded=False,
         )
         self.session.add(version)
-        await self.session.commit()
+        if commit:
+            await self.session.commit()
+        else:
+            await self.session.flush()
         return version
 
     async def current(self, record_type: str, canonical_key: str) -> RecordVersionModel | None:
