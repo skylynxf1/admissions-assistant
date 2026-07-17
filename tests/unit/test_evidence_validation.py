@@ -67,3 +67,53 @@ def test_candidate_evidence_must_match_the_named_snapshot() -> None:
 
     assert report.accepted is False
     assert report.issues[0].code == "snapshot_not_available"
+
+
+def test_structured_table_evidence_verifies_headers_row_and_footnote() -> None:
+    snapshot_id = uuid4()
+    evidence = _evidence(
+        "Mathematics\nName | Score | UW Course\nCalculus BC | 5 | MATH 124",
+        snapshot_id=snapshot_id,
+    ).model_copy(
+        update={
+            "table_identifier": "ap-math",
+            "row_identifier": "calc-bc",
+            "heading_context": "Mathematics",
+            "footnote_context": "Credit is subject to duplicate-credit rules.",
+        }
+    )
+    snapshot = b"""
+    <section><h3>Mathematics</h3><table id="ap-math">
+      <thead><tr><th>Name</th><th>Score</th><th>UW Course</th></tr></thead>
+      <tbody><tr id="calc-bc"><td>Calculus BC</td><td>5</td><td>MATH 124</td></tr></tbody>
+    </table><p>Credit is subject to duplicate-credit rules.</p></section>
+    """
+
+    report = validate_candidate(_course([evidence]), {snapshot_id: snapshot})
+
+    assert report.accepted is True
+
+
+def test_structured_table_evidence_rejects_invented_cell() -> None:
+    snapshot_id = uuid4()
+    evidence = _evidence(
+        "Mathematics\nName | Score | UW Course\nCalculus BC | 5 | MATH 999",
+        snapshot_id=snapshot_id,
+    ).model_copy(
+        update={
+            "table_identifier": "ap-math",
+            "row_identifier": "calc-bc",
+            "heading_context": "Mathematics",
+        }
+    )
+    snapshot = b"""
+    <section><h3>Mathematics</h3><table id="ap-math">
+      <thead><tr><th>Name</th><th>Score</th><th>UW Course</th></tr></thead>
+      <tbody><tr id="calc-bc"><td>Calculus BC</td><td>5</td><td>MATH 124</td></tr></tbody>
+    </table></section>
+    """
+
+    report = validate_candidate(_course([evidence]), {snapshot_id: snapshot})
+
+    assert report.accepted is False
+    assert report.issues[0].code == "evidence_not_found"

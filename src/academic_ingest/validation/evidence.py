@@ -13,7 +13,10 @@ from academic_ingest.validation.dates import validate_effective_dates
 from academic_ingest.validation.logical import validate_record_logic
 from academic_ingest.validation.models import ValidationIssue, ValidationReport
 from academic_ingest.validation.source_scope import validate_source_scope
-from academic_ingest.validation.tables import validate_table_evidence
+from academic_ingest.validation.tables import (
+    structured_table_evidence_matches,
+    validate_table_evidence,
+)
 
 
 class EvidenceValidation(BaseModel):
@@ -84,7 +87,8 @@ def validate_candidate(
                 )
                 continue
         check = validate_evidence(evidence.evidence_text, raw_snapshot)
-        if not check.accepted:
+        table_evidence_accepted = structured_table_evidence_matches(evidence, raw_snapshot)
+        if not check.accepted and not table_evidence_accepted:
             issues.append(
                 ValidationIssue(
                     code=check.code,
