@@ -1,51 +1,124 @@
-# Pathwise — Academic Planning OS prototype
+# Pathwise academic planning and UW Seattle ingestion
 
-Pathwise is a demo-ready academic transfer planning and simulation experience built from the original [GPT-5.6 Academic Planning OS specification](docs/product-spec.md). The prototype covers the full Transfer Planning journey with editable transcript extraction, multi-school and multi-major planning, reactive scenario simulation, requirement analysis, uncertainty escalation, and a context-aware advisor chat.
+Pathwise combines the existing Next.js academic-planning prototype with a production-oriented
+Python service for ingesting University of Washington Seattle catalog, admissions, transfer, major,
+and AP-credit evidence.
 
-> **Demo data only:** analysis, policy summaries, equivalencies, citations, and advisor answers in this prototype are realistic sample data. They are not verified official academic guidance. Final decisions belong to the institution.
+The ingestion service is conservative by design: every published claim carries an exact quote from
+an immutable source snapshot, unresolved logic stays unresolved, conflicting official claims are
+sent to review, and live network access is disabled unless an operator explicitly enables it.
 
-## Quick start
+> The saved HTML fixtures and frontend scenarios are synthetic test/demo data. They do not replace
+> advice from UW Admissions, the Registrar, an academic department, or an adviser.
 
-Requirements: Node.js 20+ and pnpm 9+ (npm also works).
+## What is implemented
+
+- Typed Pydantic domain models and matching SQLAlchemy/PostgreSQL schema
+- Content-addressed source snapshots, change events, ETag support, and append-only record versions
+- SSRF-resistant, allowlisted HTTPS fetching with response limits, rate limits, retries, redirects,
+  conditional requests, robots handling, and network opt-in
+- UW adapters for the course catalog/glossary, majors, major details, transfer admissions/policies,
+  AP credit, the public Time Schedule boundary, and Equivalency Guide discovery
+- Recursive prerequisite AST parsing and three-state evaluation: satisfied, unsatisfied, unresolved
+- Exact-evidence validation, logical validation, conflict detection, explainable confidence scoring,
+  human-review routing, and transactional publication
+- Optional GPT-5.6 structured extraction behind dependency injection; normal tests use a fake client
+- FastAPI endpoints for fixture ingestion, sources, records, conflicts, review tasks, and crawl jobs
+- Offline sample ingestion, normalized JSON export, structured logging, and 12 governance QA cases
+
+## Backend quick start
+
+Requirements: Python 3.12 and Docker (for PostgreSQL verification).
 
 ```bash
-pnpm install
-pnpm dev
+python -m pip install -e ".[dev]"
+docker compose up -d postgres
+python -m alembic upgrade head
+python -m uvicorn academic_ingest.api.app:create_app --factory --reload
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and choose **Transfer planning**. No API key or Supabase project is required for the complete demo flow.
+Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for the generated API documentation.
 
-## Quality checks
+Configuration is read from `ACADEMIC_INGEST_*` variables. See [.env.example](.env.example) and
+[config/institutions/uw_seattle.yaml](config/institutions/uw_seattle.yaml). Live acquisition requires
+both `ACADEMIC_INGEST_NETWORK_ENABLED=true` and a contact email.
+
+## Safe offline sample and export
+
+No network or OpenAI credential is used by these commands:
 
 ```bash
-pnpm typecheck
-pnpm lint
-pnpm build
+python scripts/ingest_uw_sample.py --fixture-only
+python scripts/export_uw_records.py --output tmp/uw-records.json
+python scripts/inspect_uw_sources.py
 ```
 
-## Architecture
+`inspect_uw_sources.py` reports `network_disabled` unless `--allow-network` is present. A live
+inspection also requires `ACADEMIC_INGEST_CONTACT_EMAIL`; it checks the institution allowlist,
+fetches and evaluates robots.txt, fails closed when robots policy is unavailable, and never prints
+page bodies.
 
-- `app/` — Next.js App Router pages and API route placeholders
-- `components/` — reusable flow, dashboard, and UI components
-- `lib/services/` — typed academic-planning service contracts and isolated mock implementations
-- `data/` — sample transcript and university/major policies
-- `supabase/schema.sql` — suggested persistence schema with row-level security notes
-- `docs/product-spec.md` — original product specification
-- `docs/GPT56_TODO.md` — concise production integration plan
+## API overview
 
-The frontend calls the same strict TypeScript models used by the mock service layer. Server route placeholders expose transcript extraction, academic analysis, scenario simulation, and advisor chat boundaries that can be replaced with structured GPT-5.6 responses later.
+- `GET /health`
+- `POST /crawl-jobs`, `GET /crawl-jobs/{id}`
+- `POST /pages/ingest` for a local HTML/PDF fixture
+- `GET /sources`, `GET /sources/{id}`
+- `GET /courses`, `GET /courses/{id}`
+- `GET /programs`, `GET /programs/{id}`
+- `GET /admissions-rules`, `/transfer-policies`, `/exam-credit`
+- `GET /conflicts`, `GET /review-tasks`
+- `POST /review-tasks/{id}/resolve`
 
-## Optional environment setup
+Record detail includes evidence and version history. Review resolution appends reviewer metadata and
+does not modify the original evidence.
 
-Copy `.env.example` to `.env.local` and add OpenAI/Supabase credentials when connecting production services. The current route implementations intentionally continue using sample services even when keys are present, so a key cannot accidentally make the demo claim unverified policy results.
+## Frontend quick start
 
-## Primary demo path
+Requirements: Node.js 20+. The frontend remains a demo experience and uses labeled sample services.
 
-1. Select Transfer Planning.
-2. Complete the student profile and scenario settings.
-3. Upload a PDF for sample extraction or enter courses manually.
-4. Review and edit every extracted course field.
-5. Select multiple schools and majors.
-6. Review credits, equivalencies, requirements, prerequisite chains, and recommended courses.
-7. Change residency, source-school type, transfer term, credit load, or AP credit and see the plan update.
-8. Ask the advisor a question and draft an email for an uncertain equivalency.
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) and choose **Transfer planning**.
+
+## Quality gates
+
+```bash
+python -m ruff check .
+python -m ruff format --check .
+python -m mypy src
+python -m pytest
+npm run typecheck
+npm run lint
+npm run build
+```
+
+The Python suite is offline by default and requires neither a network connection nor an OpenAI key.
+
+## Repository map
+
+- `src/academic_ingest/` — acquisition, adapters, models, governance, persistence, jobs, and API
+- `config/institutions/` — institution-specific boundaries and seed URLs
+- `alembic/` — PostgreSQL migrations
+- `scripts/` — inspection, fixture ingestion, and evidence-preserving export
+- `tests/fixtures/uw/` — synthetic, deterministic UW-shaped fixtures
+- `docs/uw-source-map.md` — inspected source inventory and access decisions
+- `docs/uw-adapter.md` — UW adapter behavior and known boundaries
+- `docs/data-model.md` — entities, evidence, versions, conflicts, and review
+- `docs/pipeline.md` — typed ingestion stages and failure isolation
+- `docs/adding-an-institution.md` — extension guide
+- `docs/safety-and-compliance.md` — network, privacy, retention, and untrusted-input controls
+- `app/`, `components/`, `lib/`, `data/` — existing Next.js prototype
+
+## Current limitations
+
+- Live source inspection is opt-in; automated live publication is intentionally not the default.
+- Time Schedule support is limited to public pages and never follows NetID-protected details.
+- The Equivalency Guide is discovery/snapshot only until a stable public surface is confirmed.
+- Missing mappings never become “no credit”; only explicit source language can create that outcome.
+- “Data Science” is retained as an Informatics curricular option when that is what the source states,
+  not invented as a separate UW Seattle major.
+- Model-assisted extraction cannot assign final confidence or bypass deterministic evidence gates.

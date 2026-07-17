@@ -55,12 +55,9 @@ async def test_fake_client_supports_requirement_expression_parsing() -> None:
         proposed_fields={"node_type": "course"},
         exact_evidence_strings=["CSE 122"],
     )
-    client = FakeStructuredExtractionClient(
-        results={"parse_requirement_expression": proposal}
-    )
+    client = FakeStructuredExtractionClient(results={"parse_requirement_expression": proposal})
 
     result = await client.parse_requirement_expression(_context())
 
     assert result.data == proposal
     assert client.calls[-1].operation == "parse_requirement_expression"
-

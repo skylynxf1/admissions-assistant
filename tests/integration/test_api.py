@@ -129,9 +129,7 @@ def test_review_resolution_records_metadata_without_mutating_evidence(
     client: TestClient,
 ) -> None:
     _ingest_course_fixture(client)
-    course = client.get("/courses", params={"subject": "CSE", "number": "143"}).json()[
-        "items"
-    ][0]
+    course = client.get("/courses", params={"subject": "CSE", "number": "143"}).json()["items"][0]
     evidence_before = client.get(f"/courses/{course['id']}").json()["evidence"]
 
     async def seed_review_task() -> str:

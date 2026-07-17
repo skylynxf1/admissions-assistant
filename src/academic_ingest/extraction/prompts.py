@@ -23,4 +23,3 @@ def instructions_for(operation: str) -> str:
     except KeyError as error:
         raise ValueError(f"unsupported structured extraction operation: {operation}") from error
     return f"{BASE_INSTRUCTIONS}\n\nOperation: {operation_instruction}"
-

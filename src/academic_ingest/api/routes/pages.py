@@ -90,9 +90,7 @@ async def ingest_page(
         extraction_client=FakeStructuredExtractionClient(),
         adapter_registry=request.app.state.adapter_registry,
     )
-    candidates = [
-        record for record in pipeline.records if isinstance(record, EvidenceBackedRecord)
-    ]
+    candidates = [record for record in pipeline.records if isinstance(record, EvidenceBackedRecord)]
     publication = await PublishingService(
         session,
         snapshots={snapshot.id: raw},

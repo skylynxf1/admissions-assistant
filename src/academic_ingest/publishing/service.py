@@ -150,9 +150,7 @@ class PublishingService:
                         continue
                     stored_evidence = await self.session.get(EvidenceRecordModel, evidence.id)
                     if stored_evidence is None:
-                        self.session.add(
-                            EvidenceRecordModel(**evidence.model_dump(mode="python"))
-                        )
+                        self.session.add(EvidenceRecordModel(**evidence.model_dump(mode="python")))
                 result.published.append(version)
             await self.session.commit()
         except Exception:

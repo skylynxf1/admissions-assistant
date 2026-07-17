@@ -101,4 +101,3 @@ async def test_rejected_fallback_becomes_reviewable_error() -> None:
     assert result.records == []
     assert result.errors[0].code == "structured_fallback_rejected"
     assert result.parser_metrics.parse_failures == 1
-

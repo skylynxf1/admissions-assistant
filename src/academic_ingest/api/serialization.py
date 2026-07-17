@@ -64,9 +64,7 @@ async def list_current_versions(
     for field, expected in (filters or {}).items():
         if expected is not None:
             versions = [
-                version
-                for version in versions
-                if _matches(version.payload.get(field), expected)
+                version for version in versions if _matches(version.payload.get(field), expected)
             ]
     return [version for version in versions if _is_effective(version.payload, effective_at)]
 
@@ -83,4 +81,3 @@ async def evidence_for_version(
     )
     by_id = {item.id: item for item in result}
     return [serialize_model(by_id[item_id]) for item_id in evidence_ids if item_id in by_id]
-

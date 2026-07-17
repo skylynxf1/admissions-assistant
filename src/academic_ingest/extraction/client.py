@@ -34,4 +34,3 @@ class StructuredExtractionClient(Protocol):
     async def summarize_unresolved_issue(
         self, context: ExtractionContext, issue: str
     ) -> ExtractionResult[ExtractionProposal]: ...
-

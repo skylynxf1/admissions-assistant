@@ -14,9 +14,7 @@ router = APIRouter(prefix="/sources", tags=["sources"])
 
 @router.get("")
 async def list_sources(session: SessionDep) -> dict[str, object]:
-    pages = await session.scalars(
-        select(SourcePageModel).order_by(SourcePageModel.canonical_url)
-    )
+    pages = await session.scalars(select(SourcePageModel).order_by(SourcePageModel.canonical_url))
     return {"items": [serialize_model(page) for page in pages]}
 
 

@@ -34,7 +34,7 @@ from academic_ingest.db.base import Base
 from academic_ingest.db.session import create_engine_and_session
 
 
-def _adapter_registry() -> AdapterRegistry:
+def build_default_adapter_registry() -> AdapterRegistry:
     return AdapterRegistry(
         [
             CourseCatalogAdapter(),
@@ -70,7 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.institution_config = institution_config
-    app.state.adapter_registry = _adapter_registry()
+    app.state.adapter_registry = build_default_adapter_registry()
 
     @app.get("/health")
     async def health(session: SessionDep) -> dict[str, object]:

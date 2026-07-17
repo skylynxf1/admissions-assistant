@@ -20,4 +20,3 @@ def validate_extraction_proposal(
         if source_url != context.canonical_url:
             issues.append(f"unsupported_source_url: {source_url}")
     return issues
-

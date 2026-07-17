@@ -24,10 +24,7 @@ def _table(node: Node) -> StructuredTable:
     headers = [" ".join(cell.text(separator=" ", strip=True).split()) for cell in node.css("th")]
     rows: list[list[str]] = []
     for row in node.css("tr"):
-        cells = [
-            " ".join(cell.text(separator=" ", strip=True).split())
-            for cell in row.css("td")
-        ]
+        cells = [" ".join(cell.text(separator=" ", strip=True).split()) for cell in row.css("td")]
         if cells:
             rows.append(cells)
     return StructuredTable(headers=headers, rows=rows)
@@ -48,9 +45,7 @@ def build_extraction_context(context: AdapterContext) -> ExtractionContext:
     if context.selected_course_codes is not None:
         deterministic_fields["selected_course_codes"] = sorted(context.selected_course_codes)
     if context.selected_program_names is not None:
-        deterministic_fields["selected_program_names"] = sorted(
-            context.selected_program_names
-        )
+        deterministic_fields["selected_program_names"] = sorted(context.selected_program_names)
     return ExtractionContext(
         institution_id=context.institution_id,
         institution_name=(
@@ -83,9 +78,7 @@ async def run_ingest_job(
                 adapter = adapter_registry.for_context(context)
             except AdapterNotFoundError:
                 result.parser_metrics.gpt_fallback_calls += 1
-                fallback = await extraction_client.extract_policy(
-                    build_extraction_context(context)
-                )
+                fallback = await extraction_client.extract_policy(build_extraction_context(context))
                 if fallback.data is None:
                     result.parser_metrics.parse_failures += 1
                     result.errors.append(
@@ -119,4 +112,3 @@ async def run_ingest_job(
                 )
             )
     return result
-

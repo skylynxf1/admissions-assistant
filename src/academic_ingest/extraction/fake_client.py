@@ -92,4 +92,3 @@ class FakeStructuredExtractionClient:
             }
         )
         return await self._execute("summarize_unresolved_issue", enriched)
-

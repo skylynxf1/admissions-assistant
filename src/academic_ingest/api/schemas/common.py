@@ -30,4 +30,3 @@ class PageIngestResponse(BaseModel):
     review_task_ids: list[str] = Field(default_factory=list)
     warnings: list[dict[str, object]] = Field(default_factory=list)
     errors: list[dict[str, object]] = Field(default_factory=list)
-
