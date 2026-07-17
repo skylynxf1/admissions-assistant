@@ -9,3 +9,7 @@ out/
 .DS_Store
 supabase/.branches/
 supabase/.temp/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc

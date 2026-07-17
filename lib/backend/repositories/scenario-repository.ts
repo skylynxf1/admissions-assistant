@@ -28,16 +28,37 @@ export class SupabaseScenarioRepository {
   async save(request: SaveScenarioRequest): Promise<PersistedScenario> {
     const clientId = request.clientId ?? "active-transfer-plan";
     const prioritySlug = request.prioritySchoolId ? schoolSlugs[request.prioritySchoolId] : null;
+    const selectedSlugs = [...new Set(request.input.targets.map((target) => schoolSlugs[target.schoolId]).filter(Boolean))];
+    const institutionLookup = selectedSlugs.length
+      ? await this.userClient.schema("catalog").from("institutions").select("id,slug").in("slug", selectedSlugs)
+      : { data: [], error: null };
+    if (institutionLookup.error) throw new Error(`Could not resolve target institutions: ${institutionLookup.error.message}`);
+    const institutionIds = new Map((institutionLookup.data ?? []).map((item) => [item.slug, item.id]));
+
+    const currentInstitutionLookup = await this.userClient.schema("catalog").from("institutions")
+      .select("id")
+      .ilike("name", request.input.scenario.currentInstitution)
+      .limit(1)
+      .maybeSingle();
+    if (currentInstitutionLookup.error) throw new Error(`Could not resolve current institution: ${currentInstitutionLookup.error.message}`);
+    const currentInstitutionId = currentInstitutionLookup.data?.id ?? null;
+
+    const selectedProgramSlugs = [...new Set(request.input.targets.flatMap((target) =>
+      target.majorIds.map((majorId) => majorId.startsWith(`${target.schoolId}-`) ? majorId.slice(target.schoolId.length + 1) : majorId),
+    ))];
+    const programLookup = selectedProgramSlugs.length
+      ? await this.userClient.schema("catalog").from("programs").select("id,institution_id,slug").in("slug", selectedProgramSlugs)
+      : { data: [], error: null };
+    if (programLookup.error) throw new Error(`Could not resolve target programs: ${programLookup.error.message}`);
+    const programIds = new Map((programLookup.data ?? []).map((item) => [`${item.institution_id}:${item.slug}`, item.id]));
+
     let priorityInstitutionId: string | null = null;
-    if (prioritySlug) {
-      const lookup = await this.userClient.schema("catalog").from("institutions").select("id").eq("slug", prioritySlug).maybeSingle();
-      if (lookup.error) throw new Error(`Could not resolve priority institution: ${lookup.error.message}`);
-      priorityInstitutionId = lookup.data?.id ?? null;
-    }
+    if (prioritySlug) priorityInstitutionId = institutionIds.get(prioritySlug) ?? null;
 
     const profileResult = await this.userClient.schema("student").from("profiles").upsert({
       id: this.userId,
       display_name: request.input.profile.firstName,
+      current_institution_id: currentInstitutionId,
       current_institution_name: request.input.profile.currentInstitution,
       institution_type: request.input.profile.institutionType,
       residency_status: request.input.profile.residency,
@@ -52,6 +73,12 @@ export class SupabaseScenarioRepository {
       name: request.name ?? "My transfer plan",
       planning_mode: request.planningMode ?? "transfer",
       priority_institution_id: priorityInstitutionId,
+      current_institution_id: currentInstitutionId,
+      target_term: request.input.scenario.targetTransferTerm,
+      max_credits: request.input.scenario.preferredCreditLoad,
+      residency_status: request.input.scenario.residency,
+      institution_type: request.input.scenario.institutionType,
+      graduation_target: request.input.scenario.graduationTarget,
       profile_snapshot: json(request.input.profile),
       settings: json(request.input.scenario),
       assumptions: json({ selectedTargets: request.input.targets }),
@@ -62,17 +89,25 @@ export class SupabaseScenarioRepository {
     const clearTargets = await this.userClient.schema("planning").from("scenario_targets").delete().eq("scenario_id", scenarioId);
     if (clearTargets.error) throw new Error(`Could not refresh scenario targets: ${clearTargets.error.message}`);
     const targetRows: Database["planning"]["Tables"]["scenario_targets"]["Insert"][] = [];
-    request.input.targets.forEach((target) => {
+    request.input.targets.forEach((target, targetIndex) => {
+      const institutionId = institutionIds.get(schoolSlugs[target.schoolId]) ?? null;
+      const targetPriority = target.schoolId === request.prioritySchoolId ? 1 : targetIndex + 2;
       if (target.majorIds.length === 0) {
-        targetRows.push({ scenario_id: scenarioId, institution_key: target.schoolId, program_key: null, is_priority: target.schoolId === request.prioritySchoolId });
+        targetRows.push({ scenario_id: scenarioId, institution_id: institutionId, institution_key: target.schoolId, program_key: null, is_priority: target.schoolId === request.prioritySchoolId, priority: targetPriority });
         return;
       }
-      target.majorIds.forEach((majorId) => targetRows.push({
-        scenario_id: scenarioId,
-        institution_key: target.schoolId,
-        program_key: majorId,
-        is_priority: target.schoolId === request.prioritySchoolId,
-      }));
+      target.majorIds.forEach((majorId) => {
+        const programSlug = majorId.startsWith(`${target.schoolId}-`) ? majorId.slice(target.schoolId.length + 1) : majorId;
+        targetRows.push({
+          scenario_id: scenarioId,
+          institution_id: institutionId,
+          institution_key: target.schoolId,
+          program_id: institutionId ? programIds.get(`${institutionId}:${programSlug}`) ?? null : null,
+          program_key: majorId,
+          is_priority: target.schoolId === request.prioritySchoolId,
+          priority: targetPriority,
+        });
+      });
     });
     if (targetRows.length) {
       const targetsResult = await this.userClient.schema("planning").from("scenario_targets").insert(targetRows);

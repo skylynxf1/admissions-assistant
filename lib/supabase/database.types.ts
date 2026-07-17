@@ -99,6 +99,12 @@ interface ScenarioRow {
   profile_snapshot: Json;
   settings: Json;
   assumptions: Json;
+  current_institution_id: string | null;
+  target_term: string | null;
+  max_credits: number | null;
+  residency_status: string | null;
+  institution_type: string | null;
+  graduation_target: string | null;
   is_archived: boolean;
   created_at: string;
   updated_at: string;
@@ -215,13 +221,13 @@ export type Database = {
   planning: Schema<{
     scenarios: Table<
       ScenarioRow,
-      Pick<ScenarioRow, "user_id" | "client_id" | "name" | "planning_mode" | "profile_snapshot" | "settings"> & Partial<Pick<ScenarioRow, "priority_institution_id" | "transcript_id" | "assumptions" | "is_archived">>,
+      Pick<ScenarioRow, "user_id" | "client_id" | "name" | "planning_mode" | "profile_snapshot" | "settings"> & Partial<Pick<ScenarioRow, "priority_institution_id" | "transcript_id" | "assumptions" | "current_institution_id" | "target_term" | "max_credits" | "residency_status" | "institution_type" | "graduation_target" | "is_archived">>,
       Partial<Omit<ScenarioRow, "id" | "user_id" | "created_at" | "updated_at">>
     >;
     scenario_targets: Table<
-      { id: string; scenario_id: string; institution_id: string | null; institution_key: string; program_id: string | null; program_key: string | null; is_priority: boolean; created_at: string },
-      { id?: string; scenario_id: string; institution_id?: string | null; institution_key: string; program_id?: string | null; program_key?: string | null; is_priority?: boolean },
-      { institution_id?: string | null; institution_key?: string; program_id?: string | null; program_key?: string | null; is_priority?: boolean }
+      { id: string; scenario_id: string; institution_id: string | null; institution_key: string; program_id: string | null; program_key: string | null; is_priority: boolean; priority: number; created_at: string },
+      { id?: string; scenario_id: string; institution_id?: string | null; institution_key: string; program_id?: string | null; program_key?: string | null; is_priority?: boolean; priority?: number },
+      { institution_id?: string | null; institution_key?: string; program_id?: string | null; program_key?: string | null; is_priority?: boolean; priority?: number }
     >;
     planned_courses: Table<
       { id: string; scenario_id: string; client_id: string; course_id: string | null; course_code: string; title: string; credits: number; term_id: string; term_label: string; satisfies: string[]; source: string; created_at: string },

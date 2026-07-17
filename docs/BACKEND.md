@@ -77,6 +77,8 @@ The central rule is enforced structurally: source records never contain student 
 | `POST /api/transcript-documents/:id/confirm` | User bearer token | Confirms reviewed facts after blocking warnings are resolved |
 | `POST /api/ingestion/evidence` | `x-ingestion-secret` | Upserts a page/snapshot and inserts pending evidence claims |
 
+The separate Python recommendation service exposes `POST /api/v1/scenarios/:scenario_id/recommendations` on port 8002. It reads Supabase with the server-only service role, builds an in-memory NetworkX prerequisite graph, evaluates relational prerequisite groups, and returns deterministic ranked results with source IDs and a complete score breakdown. See [`services/course-recommendation/README.md`](../services/course-recommendation/README.md).
+
 The analysis, simulation, and advisor routes still use sample academic-policy services. Transcript extraction has its own production boundary and uses labeled sample output only when the parser/model stack is unavailable. See [TRANSCRIPT_PIPELINE.md](TRANSCRIPT_PIPELINE.md).
 
 ## Evidence ingestion contract

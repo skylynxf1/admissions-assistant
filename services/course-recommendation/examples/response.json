@@ -1,0 +1,74 @@
+{
+  "scenario_id": "90000000-0000-0000-0000-000000000001",
+  "target_term": "autumn-2026",
+  "recommendations": [
+    {
+      "course_id": "calc2",
+      "course_code": "MATH& 152",
+      "title": "Calculus II",
+      "score": 78.16,
+      "rank": 1,
+      "eligibility": {
+        "eligible": true,
+        "eligible_with_concurrent_enrollment": false,
+        "satisfied_groups": ["g-calc2"],
+        "unsatisfied_groups": [],
+        "missing_courses": [],
+        "minimum_grade_failures": [],
+        "placement_alternatives": [],
+        "permission_requirements": [],
+        "confidence": "high"
+      },
+      "features": {
+        "course_id": "calc2",
+        "selected_programs_helped": 3,
+        "selected_institutions_helped": 2,
+        "requirements_satisfied": ["Calculus II", "Linear algebra", "Quantitative preparation"],
+        "general_education_categories_satisfied": ["NSc", "QR"],
+        "directly_unlocked_courses": ["linear"],
+        "descendant_courses_unlocked": ["linear"],
+        "required_descendants_unlocked": ["linear"],
+        "dependency_depth_reduction": 1,
+        "estimated_graduation_terms_saved": 1,
+        "offered_infrequently": false,
+        "equivalency_confidence": "high",
+        "duplicate_credit_risk": false,
+        "dead_end_risk": 0.0,
+        "scenario_priorities_helped": [1, 2, 3],
+        "university_coverage": {
+          "10000000-0000-0000-0000-000000000001": ["DIRECT_EQUIVALENT", "GENERAL_EDUCATION", "PREREQUISITE_APPLICABLE"],
+          "10000000-0000-0000-0000-000000000002": ["DIRECT_EQUIVALENT", "GENERAL_EDUCATION", "PREREQUISITE_APPLICABLE"]
+        },
+        "dead_end_factors": ["applies to multiple selected programs", "also satisfies general education", "unlocks required descendants"],
+        "source_ids": ["src-course-calc2", "src-eq-calc2-uw", "src-eq-calc2-uc"]
+      },
+      "score_breakdown": {
+        "major_coverage_score": 30.612,
+        "university_coverage_score": 20.408,
+        "unlock_score": 9.796,
+        "dual_requirement_score": 12.245,
+        "graduation_acceleration_score": 5.102,
+        "infrequent_offering_score": 0.0,
+        "uncertain_equivalency_penalty": 0.0,
+        "dead_end_penalty": 0.0,
+        "duplicate_credit_penalty": 0.0
+      },
+      "usefulness_label": "MULTI_PLAN_USEFUL",
+      "risk_level": "LOW",
+      "reasons": [
+        "Applies to 3 selected programs.",
+        "Has accepted applicability records at 2 selected institutions.",
+        "Taking it now may conservatively avoid up to 1 term of prerequisite delay."
+      ],
+      "warnings": [],
+      "source_ids": ["src-course-calc2", "src-eq-calc2-uw", "src-eq-calc2-uc"]
+    }
+  ],
+  "excluded_courses": [
+    {"course_id": "calc1", "course_code": "MATH& 151", "reason": "Course is already completed."}
+  ],
+  "data_warnings": ["Sample data only: course rules, offerings, and equivalencies are fictional and are not verified official information."],
+  "generated_at": "2026-07-17T00:00:00Z",
+  "scenario_fingerprint": "example-sha256-fingerprint",
+  "cache_hit": false
+}

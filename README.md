@@ -31,6 +31,7 @@ pnpm build
 - `data/` — sample transcript and university/major policies
 - `supabase/migrations/` — executable domain-separated Supabase schema, indexes, storage, and RLS
 - `supabase/seed.sql` — labeled local sample catalog data
+- `services/course-recommendation/` — deterministic FastAPI/NetworkX recommendation and prerequisite service
 - `docs/BACKEND.md` — Supabase setup, security model, routes, and ingestion contract
 - `docs/product-spec.md` — original product specification
 - `docs/GPT56_TODO.md` — concise production integration plan
@@ -38,6 +39,8 @@ pnpm build
 The frontend calls the same strict TypeScript models used by the mock service layer. Server route placeholders expose transcript extraction, academic analysis, scenario simulation, and advisor chat boundaries that can be replaced with structured GPT-5.6 responses later.
 
 The private transcript ingestion architecture—including Docling worker setup, strict extraction, validation, review APIs, and Supabase tables—is documented in [docs/TRANSCRIPT_PIPELINE.md](docs/TRANSCRIPT_PIPELINE.md).
+
+The deterministic course recommendation service—including prerequisite traversal, relational AND/OR eligibility, source-traceable features, configurable scoring, caching, and its FastAPI endpoint—is documented in [services/course-recommendation/README.md](services/course-recommendation/README.md). It runs on port 8002 and uses labeled fictional data when Supabase credentials are absent.
 
 ## Optional environment setup
 
