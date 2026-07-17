@@ -10,7 +10,12 @@ from academic_ingest.confidence.rules import ConfidenceFactors
 from academic_ingest.confidence.scorer import score_confidence
 from academic_ingest.conflicts.detector import detect_conflicts
 from academic_ingest.conflicts.models import canonical_record_key, record_type_name
-from academic_ingest.db.models import ConflictRecordModel, RecordVersionModel, ReviewTaskModel
+from academic_ingest.db.models import (
+    ConflictRecordModel,
+    EvidenceRecordModel,
+    RecordVersionModel,
+    ReviewTaskModel,
+)
 from academic_ingest.db.repositories import VersionRepository
 from academic_ingest.models.domain import ConflictRecord, EvidenceBackedRecord, ReviewTask
 from academic_ingest.models.enums import Severity
@@ -139,6 +144,15 @@ class PublishingService:
                     evidence_record_ids=[evidence.id for evidence in record.evidence],
                     commit=False,
                 )
+                retained_evidence_ids = set(version.evidence_record_ids)
+                for evidence in record.evidence:
+                    if str(evidence.id) not in retained_evidence_ids:
+                        continue
+                    stored_evidence = await self.session.get(EvidenceRecordModel, evidence.id)
+                    if stored_evidence is None:
+                        self.session.add(
+                            EvidenceRecordModel(**evidence.model_dump(mode="python"))
+                        )
                 result.published.append(version)
             await self.session.commit()
         except Exception:
