@@ -1,8 +1,8 @@
 # Bellevue College to UW Seattle Transfer Backend Design
 
-**Date:** 2026-07-18  
-**Status:** Approved design  
-**Source institution:** Bellevue College  
+**Date:** 2026-07-18
+**Status:** Approved design
+**Source institution:** Bellevue College
 **Destination:** University of Washington, Seattle campus
 
 ## Objective
