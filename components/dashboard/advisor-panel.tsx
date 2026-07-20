@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Bot, LoaderCircle, MessageCircle, Sparkles, X } from "lucide-react";
+import { ArrowUp, Bot, MessageCircle, X } from "lucide-react";
 import { useApp } from "@/components/app-provider";
 import { academicPlanningServices } from "@/lib/services";
 import type { AdvisorMessage } from "@/lib/types";
@@ -41,7 +41,8 @@ export function AdvisorPanel({ open, onClose }: { open: boolean; onClose: () => 
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/25 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <aside className="flex h-full w-full max-w-[440px] flex-col border-l border-slate-200 bg-white shadow-2xl">
         <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div className="flex items-center gap-3"><div className="grid size-9 place-items-center rounded-xl bg-[var(--ink)] text-lime-200"><Sparkles className="size-4" /></div><div><h2 className="font-semibold text-slate-900">Pathwise advisor</h2><p className="text-xs text-slate-500">Uses only saved transcript + policy data</p></div></div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <div className="flex items-center gap-3"><img src="/pathly/logo/pathly-logo-192.png" width={36} height={36} alt="" className="block" /><div><h2 className="font-bold text-[var(--forest)]">Ask Pip</h2><p className="text-xs text-slate-500">Uses only saved transcript + policy data</p></div></div>
           <button onClick={onClose} aria-label="Close advisor" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="size-5" /></button>
         </header>
         <div className="border-b border-amber-200 bg-amber-50 px-5 py-2.5 text-xs leading-5 text-amber-900">This prototype is grounded in unverified sample records. It does not search the open web or invent missing policy details.</div>
@@ -49,13 +50,15 @@ export function AdvisorPanel({ open, onClose }: { open: boolean; onClose: () => 
           {advisorMessages.map((message) => (
             <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "rounded-br-md bg-[var(--ink)] text-white" : "rounded-bl-md border border-slate-200 bg-slate-50 text-slate-700"}`}>
-                {message.role === "assistant" && <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-teal-700"><Bot className="size-3.5" /> Sample advisor</div>}
+                {message.role === "assistant" && <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-teal-700"><Bot className="size-3.5" /> Pip · sample advisor</div>}
                 <p>{message.content}</p>
                 {message.role === "assistant" && message.citationIds && message.citationIds.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{message.citationIds.map((citationId) => { const citation = analysis?.citations.find((item) => item.id === citationId); return citation ? <a key={citationId} href={citation.url} target="_blank" rel="noreferrer" className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-teal-700 ring-1 ring-slate-200">Sample source · {citation.publisher}</a> : null; })}</div>}
               </div>
             </div>
           ))}
-          {loading && <div className="flex justify-start"><div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500"><LoaderCircle className="size-4 animate-spin text-teal-600" /> Reasoning across your scenario…</div></div>}
+          {loading && <div className="flex justify-start"><div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/pathly/loading/pip-loading.gif" alt="" width={28} className="block" /> Checking your saved records…</div></div>}
         </div>
         <div className="border-t border-slate-200 bg-white p-4">
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{quickQuestions.map((item) => <button key={item} onClick={() => void ask(item)} disabled={loading || !analysis} className="shrink-0 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-teal-300 hover:bg-teal-50">{item}</button>)}</div>

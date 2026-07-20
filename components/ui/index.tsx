@@ -1,41 +1,118 @@
-import { AlertTriangle, Check, CircleHelp, GitCompareArrows, Info, SearchCheck, Sparkles, UserRoundCheck } from "lucide-react";
+/* eslint-disable @next/next/no-img-element */
+import { AlertTriangle, Archive, Check, CircleHelp, GitCompareArrows, Info, SearchCheck, Sparkles, UserRoundCheck } from "lucide-react";
 import type { ConfidenceLevel, RequirementState, VerificationStatus } from "@/lib/types";
 
 export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="grid size-9 place-items-center rounded-xl bg-[var(--ink)] text-white shadow-sm">
-        <svg viewBox="0 0 32 32" className="size-5" aria-hidden="true">
-          <path d="M6 23.5 15.8 7 26 23.5h-5.1l-5.1-8.8-5.2 8.8H6Z" fill="currentColor" />
-          <path d="M11.5 23.5h9" stroke="#b8ef70" strokeWidth="2.5" strokeLinecap="round" />
-        </svg>
-      </div>
+      <img src="/pathly/logo/pathly-logo-192.png" width={34} height={34} alt="" className="block" />
       {!compact && (
-        <span className="text-[17px] font-semibold tracking-[-0.03em] text-[var(--ink)]">Pathwise</span>
+        <span className="text-[22px] font-extrabold leading-none text-[var(--forest)]" style={{ fontFamily: "var(--font-heading)" }}>Pathly</span>
       )}
     </div>
   );
 }
 
+const pipPoses = {
+  wave: "00",
+  thinking: "01",
+  celebrate: "02",
+  caution: "03",
+  roadmap: "04",
+  "thumbs-up": "05",
+} as const;
+
+export type PipPose = keyof typeof pipPoses;
+
+/**
+ * Pip, the Pathly mascot. Always rendered from the mascot pack PNGs — never
+ * redrawn with emoji, CSS, or SVG.
+ */
+export function PipAssistant({
+  mode = "reaction", pose = "wave", size = 140, alt = "", className, style, children,
+}: {
+  mode?: "reaction" | "bubble" | "pet" | "loading";
+  pose?: PipPose;
+  size?: number;
+  alt?: string;
+  className?: string;
+  style?: React.CSSProperties;
+  children?: React.ReactNode;
+}) {
+  if (mode === "bubble") {
+    return (
+      <div className={className} style={{ position: "relative", maxWidth: 460, ...style }}>
+        <img src="/pathly/assistant/pip-speech-bubble.png" alt={alt} className="block w-full" />
+        <div className="absolute flex items-center text-[15px] font-medium leading-[22px] text-[var(--ink)]" style={{ left: "7%", right: "9%", top: "36%", bottom: "18%" }}>
+          <div>{children}</div>
+        </div>
+      </div>
+    );
+  }
+  if (mode === "pet") {
+    return <img src="/pathly/pet/pip-mini-pet.png" alt={alt} width={size} className={`block ${className ?? ""}`} style={style} />;
+  }
+  if (mode === "loading") {
+    return (
+      <div className={`text-center ${className ?? ""}`} style={style}>
+        <picture>
+          <source srcSet="/pathly/loading/pip-loading-frame-00.png" media="(prefers-reduced-motion: reduce)" />
+          <img src="/pathly/loading/pip-loading.gif" alt={alt || "Working on it"} width={size} className="mx-auto block" />
+        </picture>
+        {children && <div role="status" className="mt-3 text-base font-bold text-[var(--forest)]" style={{ fontFamily: "var(--font-heading)" }}>{children}</div>}
+      </div>
+    );
+  }
+  return (
+    <div className={`text-center ${className ?? ""}`} style={style}>
+      <img src={`/pathly/reactions/pip-reaction-${pipPoses[pose]}.png`} alt={alt} width={size} className="mx-auto block" />
+      {children && <div className="mt-2 text-sm text-[var(--muted-ink)]">{children}</div>}
+    </div>
+  );
+}
+
+type ChipStatus = "verified" | "high-confidence" | "review" | "unresolved" | "deprecated" | "blocked" | "overlap";
+
+const chipConfig: Record<ChipStatus, { bg: string; fg: string; bd: string; dotted?: boolean; icon: typeof Check; label: string }> = {
+  verified: { bg: "var(--mint-wash)", fg: "var(--forest)", bd: "var(--pip-mint)", icon: Check, label: "Verified" },
+  "high-confidence": { bg: "#EAF6F8", fg: "#2B6470", bd: "var(--sky)", icon: Check, label: "High confidence" },
+  review: { bg: "#FDF3DC", fg: "#7A5B12", bd: "var(--butter)", icon: SearchCheck, label: "Needs review" },
+  unresolved: { bg: "var(--paper)", fg: "var(--muted-ink)", bd: "var(--border)", dotted: true, icon: CircleHelp, label: "Unresolved" },
+  deprecated: { bg: "#F0F0EC", fg: "var(--muted-ink)", bd: "#C9CFC9", icon: Archive, label: "Deprecated" },
+  blocked: { bg: "#FBEDEB", fg: "var(--danger)", bd: "var(--danger)", icon: AlertTriangle, label: "Blocked" },
+  overlap: { bg: "#FDF3DC", fg: "#7A5B12", bd: "var(--butter)", icon: Sparkles, label: "Opens more paths" },
+};
+
+/** Pathly status chip — status icons always pair with text, never color alone. */
+export function StatusChip({ status = "verified", label, className }: { status?: ChipStatus; label?: string; className?: string }) {
+  const config = chipConfig[status];
+  const Icon = config.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-[13px] font-semibold ${className ?? ""}`}
+      style={{ background: config.bg, color: config.fg, border: `1px ${config.dotted ? "dotted" : "solid"} ${config.bd}` }}
+    >
+      <Icon className="size-3" aria-hidden="true" />{label || config.label}
+    </span>
+  );
+}
+
 export function ConfidenceBadge({ level }: { level: ConfidenceLevel }) {
-  const styles = {
-    high: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    medium: "bg-amber-50 text-amber-700 ring-amber-200",
-    low: "bg-rose-50 text-rose-700 ring-rose-200",
-  };
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ring-1 ring-inset ${styles[level]}`}>{level}</span>;
+  const statuses: Record<ConfidenceLevel, ChipStatus> = { high: "verified", medium: "review", low: "blocked" };
+  const labels: Record<ConfidenceLevel, string> = { high: "High", medium: "Medium", low: "Low" };
+  return <StatusChip status={statuses[level]} label={labels[level]} />;
 }
 
 export function StateBadge({ state }: { state: RequirementState }) {
   const config = {
-    complete: { label: "Complete", classes: "bg-emerald-50 text-emerald-700", icon: Check },
-    "in-progress": { label: "In progress", classes: "bg-blue-50 text-blue-700", icon: Sparkles },
-    missing: { label: "Missing", classes: "bg-rose-50 text-rose-700", icon: AlertTriangle },
-    uncertain: { label: "Confirm", classes: "bg-amber-50 text-amber-700", icon: Info },
+    complete: { label: "Complete", classes: "bg-[var(--mint-wash)] text-[var(--forest)] border-[var(--pip-mint)]", icon: Check },
+    "in-progress": { label: "In progress", classes: "bg-[#EAF6F8] text-[#2B6470] border-[var(--sky)]", icon: Sparkles },
+    missing: { label: "Missing", classes: "bg-[#FBEDEB] text-[var(--danger)] border-[var(--danger)]", icon: AlertTriangle },
+    uncertain: { label: "Confirm", classes: "bg-[#FDF3DC] text-[#7A5B12] border-[var(--butter)]", icon: Info },
   }[state];
   const Icon = config.icon;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${config.classes}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${config.classes}`}>
       <Icon className="size-3" />{config.label}
     </span>
   );
@@ -43,15 +120,15 @@ export function StateBadge({ state }: { state: RequirementState }) {
 
 export function VerificationBadge({ status }: { status: VerificationStatus }) {
   const config = {
-    confirmed: { label: "Confirmed", classes: "bg-emerald-50 text-emerald-700 ring-emerald-200", icon: SearchCheck },
-    likely: { label: "Likely", classes: "bg-blue-50 text-blue-700 ring-blue-200", icon: Check },
-    unclear: { label: "Unclear", classes: "bg-amber-50 text-amber-800 ring-amber-200", icon: CircleHelp },
-    "manual-evaluation": { label: "Requires manual evaluation", classes: "bg-violet-50 text-violet-700 ring-violet-200", icon: UserRoundCheck },
-    conflicting: { label: "Conflicting information", classes: "bg-rose-50 text-rose-700 ring-rose-200", icon: GitCompareArrows },
+    confirmed: { label: "Confirmed", classes: "bg-[var(--mint-wash)] text-[var(--forest)] border-[var(--pip-mint)]", icon: SearchCheck },
+    likely: { label: "Likely", classes: "bg-[#EAF6F8] text-[#2B6470] border-[var(--sky)]", icon: Check },
+    unclear: { label: "Unclear", classes: "bg-[#FDF3DC] text-[#7A5B12] border-[var(--butter)]", icon: CircleHelp },
+    "manual-evaluation": { label: "Requires manual evaluation", classes: "bg-[#F3F0FA] text-[#5D4E8C] border-[var(--lavender)]", icon: UserRoundCheck },
+    conflicting: { label: "Conflicting information", classes: "bg-[#FBEDEB] text-[var(--danger)] border-[var(--danger)]", icon: GitCompareArrows },
   }[status];
   const Icon = config.icon;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${config.classes}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${config.classes}`}>
       <Icon className="size-3" />{config.label}
     </span>
   );
@@ -59,17 +136,17 @@ export function VerificationBadge({ status }: { status: VerificationStatus }) {
 
 export function SampleDataBanner({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={`flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/80 text-amber-950 ${compact ? "px-3 py-2 text-xs" : "px-4 py-3 text-sm"}`}>
-      <Info className="mt-0.5 size-4 shrink-0 text-amber-600" />
+    <div className={`flex items-start gap-2.5 rounded-[var(--radius-control)] border border-[var(--butter)] bg-[var(--surface-attention)] text-[#4C380A] ${compact ? "px-3 py-2 text-xs" : "px-4 py-3 text-sm"}`}>
+      <Info className="mt-0.5 size-4 shrink-0 text-[#8A6810]" />
       <p><strong>Sample data:</strong> Demo policy results and citations are not verified official guidance. Confirm uncertain items before making academic decisions.</p>
     </div>
   );
 }
 
 export function ProgressBar({ value, tone = "teal" }: { value: number; tone?: "teal" | "violet" | "amber" }) {
-  const tones = { teal: "bg-teal-500", violet: "bg-violet-500", amber: "bg-amber-500" };
+  const tones = { teal: "bg-[var(--path-green)]", violet: "bg-[var(--lavender)]", amber: "bg-[var(--butter)]" };
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+    <div className="h-2 overflow-hidden rounded-full bg-[var(--mint-wash)]">
       <div className={`h-full rounded-full transition-all duration-500 ${tones[tone]}`} style={{ width: `${Math.max(2, Math.min(value, 100))}%` }} />
     </div>
   );
@@ -77,10 +154,10 @@ export function ProgressBar({ value, tone = "teal" }: { value: number; tone?: "t
 
 export function EmptyState({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-      <div className="mx-auto mb-3 grid size-10 place-items-center rounded-xl bg-white text-slate-400 shadow-sm"><Info className="size-5" /></div>
-      <h3 className="font-semibold text-slate-900">{title}</h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{description}</p>
+    <div className="rounded-[var(--radius-card)] border-2 border-dotted border-[var(--border)] bg-white px-6 py-12 text-center">
+      <PipAssistant pose="wave" size={96} alt="Pip waving" />
+      <h3 className="mt-3 text-lg font-bold text-[var(--forest)]">{title}</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-[var(--muted-ink)]">{description}</p>
     </div>
   );
 }

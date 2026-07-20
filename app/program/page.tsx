@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowRight, BookOpenCheck, Check, Code2, GraduationCap, MapPin, Scale, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Code2, GraduationCap, MapPin, Scale } from "lucide-react";
 import { useApp } from "@/components/app-provider";
+import { PipAssistant } from "@/components/ui";
 import { getSchool } from "@/data/sample-policies";
 
 export default function ProgramPage() {
@@ -13,7 +14,13 @@ export default function ProgramPage() {
   const selectedMajorIds = target?.majorIds ?? [];
 
   if (!school || !target) {
-    return <main className="mx-auto max-w-xl px-5 py-20 text-center"><h1 className="text-2xl font-semibold text-slate-900">Choose a priority school first.</h1><button onClick={() => router.push("/targets")} className="primary-button mt-5">Back to schools</button></main>;
+    return (
+      <main className="mx-auto max-w-xl px-5 py-20 text-center">
+        <PipAssistant pose="caution" size={110} alt="Pip pointing out a missing step" />
+        <h1 className="mt-4 text-2xl font-extrabold text-[var(--forest)]">Choose a priority school first.</h1>
+        <button onClick={() => router.push("/targets")} className="primary-button mt-5">Back to schools</button>
+      </main>
+    );
   }
 
   const toggleMajor = (majorId: string) => {
@@ -30,35 +37,64 @@ export default function ProgramPage() {
   ];
 
   return (
-    <main className="mx-auto max-w-5xl px-5 py-10 lg:px-8 lg:py-12">
-      <section className="overflow-hidden rounded-3xl bg-[var(--ink)] text-white shadow-xl shadow-slate-900/10">
-        <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1fr_320px] lg:p-10">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-lime-200">Your priority school</p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">{school.name}</h1>
-            <p className="mt-3 flex items-center gap-1.5 text-sm text-slate-300"><MapPin className="size-4" /> {school.location}</p>
-            <div className="mt-7"><h2 className="text-lg font-semibold">What are you interested in studying?</h2><p className="mt-1 text-sm text-slate-300">Choose one or more majors. You can add more later from the planner.</p></div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {school.majors.map((major) => {
-                const selected = selectedMajorIds.includes(major.id);
-                return <button key={major.id} onClick={() => toggleMajor(major.id)} className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition ${selected ? "border-lime-300 bg-white text-slate-900" : "border-white/15 bg-white/[0.06] text-white hover:bg-white/10"}`}><span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border ${selected ? "border-teal-600 bg-teal-600 text-white" : "border-white/30 text-transparent"}`}><Check className="size-3" /></span><span><span className="block text-sm font-semibold">{major.name}</span><span className={`mt-1 block text-xs ${selected ? "text-slate-500" : "text-slate-400"}`}>{major.college}</span></span></button>;
-              })}
+    <main className="mx-auto max-w-[1040px] px-5 py-10 lg:px-16 lg:py-10">
+      <section className="card rise overflow-hidden">
+        <div style={{ borderTop: "5px solid var(--plan-a)" }}>
+          <div className="grid gap-8 p-6 sm:p-7 lg:grid-cols-[1fr_320px]">
+            <div>
+              <p className="text-[13px] font-semibold text-[var(--path-green)]">Your priority school</p>
+              <h1 className="mt-2 text-[32px] font-extrabold leading-[38px] text-[var(--forest)] sm:text-[42px] sm:leading-[48px]">{school.name}</h1>
+              <p className="mt-2 flex items-center gap-1.5 text-sm text-[var(--muted-ink)]" style={{ fontFamily: "var(--font-data)" }}><MapPin className="size-4" /> {school.location}</p>
+              <div className="mt-7">
+                <h2 className="text-[22px] font-bold leading-7 text-[var(--forest)]">What are you interested in studying?</h2>
+                <p className="mt-1 text-sm text-[var(--muted-ink)]">Choose one or more majors. You can add more later from the planner.</p>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2.5">
+                {school.majors.map((major) => {
+                  const selected = selectedMajorIds.includes(major.id);
+                  return (
+                    <button
+                      key={major.id}
+                      onClick={() => toggleMajor(major.id)}
+                      aria-pressed={selected}
+                      className={`rounded-full border px-4 py-2.5 text-left text-sm font-semibold transition ${selected ? "border-[var(--path-green)] bg-[var(--mint-wash)] text-[var(--forest)]" : "border-[var(--border)] bg-white text-[var(--muted-ink)] hover:border-[var(--pip-mint)]"}`}
+                    >
+                      {selected ? "✓ " : ""}{major.name}
+                      <span className={`ml-1.5 text-xs font-medium ${selected ? "text-[var(--path-green)]" : "text-[var(--muted-ink)]/70"}`}>{major.college}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+            <aside className="rounded-[var(--radius-nested)] border border-[var(--border)] bg-[var(--cream)] p-5">
+              <h2 className="text-base font-bold text-[var(--forest)]">At a glance</h2>
+              <p className="mt-1.5 text-xs leading-5 text-[var(--muted-ink)]">A short sample outline before we personalize it with your transcript.</p>
+              <div className="mt-4 space-y-3">
+                {outline.map(({ Icon, title, text }) => (
+                  <div key={title} className="flex gap-3 rounded-[var(--radius-control)] bg-white p-3">
+                    <div className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-[var(--mint-wash)] text-[var(--forest)]"><Icon className="size-4" /></div>
+                    <div>
+                      <p className="text-xs font-bold text-[var(--forest)]">{title}</p>
+                      <p className="mt-1 text-[11px] leading-4 text-[var(--muted-ink)]">{text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-[11px] leading-4 text-[#7A5B12]">Sample data only. Policy details are not yet verified from a live scrape.</p>
+            </aside>
           </div>
-          <aside className="rounded-2xl bg-white p-5 text-slate-900">
-            <div className="flex items-center gap-2"><Sparkles className="size-4 text-teal-600" /><h2 className="font-semibold">At a glance</h2></div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">A short sample outline before we personalize it with your transcript.</p>
-            <div className="mt-4 space-y-3">
-              {outline.map(({ Icon, title, text }) => <div key={title} className="flex gap-3 rounded-xl bg-slate-50 p-3"><div className="grid size-8 shrink-0 place-items-center rounded-lg bg-white text-teal-700 shadow-sm"><Icon className="size-4" /></div><div><p className="text-xs font-semibold text-slate-900">{title}</p><p className="mt-1 text-[11px] leading-4 text-slate-500">{text}</p></div></div>)}
-            </div>
-            <p className="mt-4 text-[10px] leading-4 text-amber-700">Sample data only. Policy details are not yet verified from a live scrape.</p>
-          </aside>
         </div>
       </section>
 
-      <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-teal-200 bg-teal-50 p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div><p className="font-semibold text-teal-950">Ready to apply this to your record?</p><p className="mt-1 text-sm text-teal-700">We’ll turn the outline into an editable quarter-by-quarter plan.</p></div>
-        <button disabled={selectedMajorIds.length === 0} onClick={() => router.push("/dashboard")} className="primary-button shrink-0">How does this work for me? <ArrowRight className="size-4" /></button>
+      <div className="card rise mt-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between" style={{ background: "var(--gradient-hope)" }}>
+        <div className="flex items-center gap-4">
+          <PipAssistant pose="thumbs-up" size={72} alt="Pip giving a thumbs-up" />
+          <div>
+            <p className="font-bold text-[var(--forest)]" style={{ fontFamily: "var(--font-heading)" }}>Ready to apply this to your record?</p>
+            <p className="mt-1 text-sm text-[var(--muted-ink)]">We’ll turn the outline into an editable quarter-by-quarter plan.</p>
+          </div>
+        </div>
+        <button disabled={selectedMajorIds.length === 0} onClick={() => router.push("/dashboard")} className="cta-button shrink-0">Build my plan <ArrowRight className="size-4" /></button>
       </div>
     </main>
   );

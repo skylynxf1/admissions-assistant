@@ -207,12 +207,14 @@ export function SimulationSummaryPanel({ summary, updating }: { summary: Simulat
     { label: "Remaining credits", value: summary.estimatedRemainingCredits.toString(), detail: "to sample 180-credit degree" },
     { label: "Options open", value: `${summary.openOptionIds.length}/${summary.totalPrograms}`, detail: `projected GPA ${summary.projectedGpa.toFixed(2)}` },
   ];
-  return <section data-testid="simulator-summary" className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2"><TrendingUp className="size-4 text-teal-600" /><h2 className="text-sm font-semibold text-slate-900">Live scenario impact</h2><span className={`size-2 rounded-full ${updating ? "animate-pulse bg-amber-500" : "bg-emerald-500"}`} /></div>
+  return <section data-testid="simulator-summary" className="relative mt-8 overflow-visible rounded-[var(--radius-card)] border border-[var(--border)] shadow-[var(--shadow-card)]" style={{ background: "var(--gradient-hope)" }}>
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    <img src="/pathly/pet/pip-mini-pet.png" alt="" width={76} className="absolute -top-[42px] right-[26px] hidden lg:block" />
+    <div className="flex flex-col gap-2 border-b border-[var(--border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-2"><TrendingUp className="size-4 text-[var(--path-green)]" /><h2 className="text-sm font-bold text-[var(--forest)]">Live scenario impact</h2><span className={`size-2 rounded-full ${updating ? "animate-pulse bg-[var(--butter)]" : "bg-[var(--path-green)]"}`} /></div>
       <p className="text-[10px] text-slate-400">Sample calculations update after every change</p>
     </div>
-    <div className="grid grid-cols-2 divide-x divide-y divide-slate-100 lg:grid-cols-4">{metrics.map((metric) => <div key={metric.label} className="min-h-24 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{metric.label}</p><p className="mt-2 text-xl font-semibold tracking-tight text-slate-900">{metric.value}</p><p className="mt-1 text-[10px] text-slate-500">{metric.detail}</p></div>)}</div>
+    <div className="grid grid-cols-2 lg:grid-cols-4">{metrics.map((metric) => <div key={metric.label} className="min-h-24 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{metric.label}</p><p className="mt-2 text-2xl font-bold tracking-tight text-[var(--forest)]" style={{ fontFamily: "var(--font-heading)" }}>{metric.value}</p><p className="mt-1 text-[10px] text-slate-500">{metric.detail}</p></div>)}</div>
     {summary.overloadedTermIds.length > 0 && <div className="flex items-center gap-2 border-t border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800"><AlertTriangle className="size-4" />One or more quarters exceed the selected maximum credit load.</div>}
     <div className={`flex items-center gap-2 border-t px-4 py-3 text-xs ${summary.onTrackForGraduationTarget ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}><GraduationCap className="size-4" />{summary.onTrackForGraduationTarget ? `On track for the ${summary.graduationTarget} target in this sample scenario.` : `Current estimate is later than the ${summary.graduationTarget} target.`}</div>
   </section>;

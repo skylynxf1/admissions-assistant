@@ -14,7 +14,7 @@ import {
   AcademicRecordPanel, ComparisonView, CustomCoursePanel, SchoolMajorPanel,
   SettingsPanel, SimulationSummaryPanel, type SimulatorTerm,
 } from "@/components/dashboard/simulator-controls";
-import { EmptyState, ProgressBar, StateBadge, VerificationBadge } from "@/components/ui";
+import { EmptyState, PipAssistant, ProgressBar, StateBadge, VerificationBadge } from "@/components/ui";
 import { getMajor, getSchool } from "@/data/sample-policies";
 import type { CourseRecommendation, PlanComparison, PlannedCourse, VerificationItem, VerificationStatus } from "@/lib/types";
 
@@ -54,7 +54,7 @@ function buildSchedule(terms: SimulatorTerm[], plannedCourses: PlannedCourse[]) 
 }
 
 function PlannerLoading() {
-  return <main className="mx-auto max-w-[1440px] px-5 py-10 lg:px-8"><div className="skeleton h-10 w-72" /><div className="mt-8 grid gap-4 lg:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="skeleton h-72" />)}</div></main>;
+  return <main className="grid min-h-[calc(100vh-60px)] place-items-center px-5"><div className="rise text-center"><PipAssistant mode="loading" size={120}>Checking prerequisite chains…</PipAssistant><p className="mt-2.5 text-sm text-[var(--muted-ink)]">Nothing is final — you can change any input on the board.</p></div></main>;
 }
 
 export function DashboardView() {
@@ -241,7 +241,7 @@ export function DashboardView() {
 
     <main className="mx-auto max-w-[1440px] px-5 pb-28 pt-7 lg:px-8">
       {tab === "plan" && <>
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">Planning simulator</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] text-slate-900">Change anything. See what stays possible.</h1><p className="mt-2 text-sm text-slate-500">Drag courses into quarters, edit your record, or switch schools and watch the complete scenario recalculate.</p></div><div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">Sample policy data · not verified</div></div>
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="text-sm font-semibold text-[var(--path-green)]">Planning playground</p><h1 className="mt-2 text-3xl font-extrabold text-[var(--forest)]">There’s a clear path forward.</h1><p className="mt-2 text-sm text-slate-500">Drag courses into quarters, edit your record, or switch schools — the whole scenario recalculates as you go.</p></div><div className="rounded-full border border-[var(--butter)] bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Sample policy data · not verified</div></div>
 
         <SimulationSummaryPanel summary={analysis.simulationSummary} updating={analysisStatus === "analyzing"} />
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Check, Cloud, HardDrive, LoaderCircle } from "lucide-react";
+import { Check, Cloud, HardDrive, LoaderCircle, Sparkles } from "lucide-react";
 import { BrandMark } from "@/components/ui";
 import { useApp } from "@/components/app-provider";
 
@@ -18,46 +18,44 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { draftStatus, saveDraft } = useApp();
   const activeIndex = Math.max(0, steps.findIndex((step) => step.href === pathname));
+  const showProgress = pathname !== "/" && pathname !== "/dashboard";
   return (
-    <div className="min-h-screen bg-[var(--canvas)]">
-      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-5 lg:px-8">
-          <Link href="/" aria-label="Pathwise home"><BrandMark /></Link>
-          <div className="hidden items-center gap-2 md:flex">
-            <span className="rounded-full bg-lime-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-lime-800">Hackathon demo</span>
-            <span className="text-xs text-slate-400">No API key needed</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => void saveDraft()} disabled={draftStatus === "saving"} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60">
-              {draftStatus === "saving" ? <LoaderCircle className="size-3.5 animate-spin" /> : draftStatus === "saved-cloud" ? <Cloud className="size-3.5 text-teal-600" /> : draftStatus === "saved-local" ? <HardDrive className="size-3.5 text-teal-600" /> : null}
+    <div className="min-h-screen bg-[var(--paper)]">
+      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[rgba(255,253,245,.92)] backdrop-blur-lg">
+        <div className="mx-auto flex h-[60px] max-w-[1440px] items-center gap-4 px-5 lg:px-8">
+          <Link href="/" aria-label="Pathly home"><BrandMark /></Link>
+          {showProgress && (
+            <nav className="mx-auto hidden max-w-[560px] flex-1 items-center md:flex" aria-label="Planning progress">
+              {steps.slice(1).map((step, index) => {
+                const absoluteIndex = index + 1;
+                const completed = absoluteIndex < activeIndex;
+                const active = absoluteIndex === activeIndex;
+                return (
+                  <div key={step.href} className="flex items-center last:flex-none md:flex-1 md:last:flex-none">
+                    {index > 0 && <div aria-hidden="true" className="mx-2.5 min-w-6 flex-1" style={{ borderTop: `3px dotted ${completed || active ? "var(--path-green)" : "var(--border)"}` }} />}
+                    <Link href={step.href} className="flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className={`grid size-[26px] place-items-center rounded-full text-xs font-bold ${completed ? "bg-[var(--pip-mint)] text-[var(--forest)]" : active ? "bg-[var(--forest)] text-white" : "bg-[var(--cream)] text-[var(--muted-ink)]"}`}
+                      >
+                        {completed ? <Check className="size-3.5" /> : active ? <Sparkles className="size-3" /> : absoluteIndex}
+                      </span>
+                      <span className={`hidden text-xs font-semibold lg:block ${active ? "text-[var(--forest)]" : completed ? "text-[var(--path-green)]" : "text-[var(--muted-ink)]"}`}>{step.label}</span>
+                    </Link>
+                  </div>
+                );
+              })}
+            </nav>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={() => void saveDraft()} disabled={draftStatus === "saving"} className="flex items-center gap-1.5 rounded-[12px] px-3 py-2 text-sm font-semibold text-[var(--muted-ink)] hover:bg-[var(--mint-wash)] hover:text-[var(--forest)] disabled:cursor-wait disabled:opacity-60">
+              {draftStatus === "saving" ? <LoaderCircle className="size-3.5 animate-spin" /> : draftStatus === "saved-cloud" ? <Cloud className="size-3.5 text-[var(--path-green)]" /> : draftStatus === "saved-local" ? <HardDrive className="size-3.5 text-[var(--path-green)]" /> : null}
               {draftStatus === "saving" ? "Saving…" : draftStatus === "saved-cloud" ? "Saved to cloud" : draftStatus === "saved-local" ? "Saved locally" : draftStatus === "error" ? "Save failed" : "Save draft"}
             </button>
-            <div className="grid size-8 place-items-center rounded-full bg-gradient-to-br from-teal-500 to-cyan-700 text-xs font-bold text-white">AS</div>
+            <div className="grid size-[34px] place-items-center rounded-full border-[1.5px] border-[var(--pip-mint)] bg-[var(--mint-wash)] text-[13px] font-bold text-[var(--forest)]">A</div>
           </div>
         </div>
       </header>
-      {pathname !== "/" && pathname !== "/dashboard" && (
-        <div className="border-b border-slate-200 bg-white">
-          <nav className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3" aria-label="Planning progress">
-            {steps.slice(1).map((step, index) => {
-              const absoluteIndex = index + 1;
-              const completed = absoluteIndex < activeIndex;
-              const active = absoluteIndex === activeIndex;
-              return (
-                <div key={step.href} className="flex flex-1 items-center last:flex-none">
-                  <Link href={step.href} className="flex items-center gap-2">
-                    <span className={`grid size-7 place-items-center rounded-full text-xs font-bold ${completed ? "bg-teal-600 text-white" : active ? "bg-[var(--ink)] text-white" : "bg-slate-100 text-slate-400"}`}>
-                      {completed ? <Check className="size-3.5" /> : absoluteIndex}
-                    </span>
-                    <span className={`hidden text-xs font-semibold sm:block ${active ? "text-slate-900" : "text-slate-400"}`}>{step.label}</span>
-                  </Link>
-                  {index < steps.length - 2 && <div className={`mx-3 h-px flex-1 ${completed ? "bg-teal-500" : "bg-slate-200"}`} />}
-                </div>
-              );
-            })}
-          </nav>
-        </div>
-      )}
       {children}
     </div>
   );
