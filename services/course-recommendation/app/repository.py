@@ -88,6 +88,54 @@ class SupabaseRecommendationRepository:
     def _rows(self, schema: str, table: str, *, columns: str = "*") -> Any:
         return self.client.schema(schema).table(table).select(columns)
 
+    def _select_in_chunks(
+        self,
+        schema: str,
+        table: str,
+        column: str,
+        ids: list[str],
+        *,
+        chunk_size: int = 150,
+    ) -> list[dict[str, Any]]:
+        """Run `.in_(column, ids)` across multiple requests.
+
+        PostgREST sends `.in_()` filters as a GET query string; an id list in the
+        thousands overflows it and PostgREST returns 400 Bad Request. Splitting into
+        bounded chunks and concatenating results keeps behavior identical while
+        avoiding oversized requests. Empty id lists still skip the query entirely.
+        """
+        if not ids:
+            return []
+        rows: list[dict[str, Any]] = []
+        for start in range(0, len(ids), chunk_size):
+            chunk = ids[start : start + chunk_size]
+            rows.extend(self._rows(schema, table).in_(column, chunk).execute().data)
+        return rows
+
+    def _select_all_paged(
+        self, schema: str, table: str, *, columns: str = "*", page_size: int = 1000
+    ) -> list[dict[str, Any]]:
+        """Fetch every row from an unfiltered select, paging past PostgREST's row cap.
+
+        `supabase/config.toml` caps unfiltered selects at `max_rows` (1000); beyond
+        that PostgREST silently truncates instead of erroring. Paging with `.range()`
+        until a short page comes back guarantees the full table is read.
+        """
+        rows: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            page = (
+                self._rows(schema, table, columns=columns)
+                .range(offset, offset + page_size - 1)
+                .execute()
+                .data
+            )
+            rows.extend(page)
+            if len(page) < page_size:
+                break
+            offset += page_size
+        return rows
+
     async def load_dataset(self, scenario_id: str) -> ScenarioDataset:
         scenario_rows = (
             self._rows("planning", "scenarios").eq("id", scenario_id).limit(1).execute().data
@@ -114,23 +162,17 @@ class SupabaseRecommendationRepository:
         if not current_institution_id:
             raise ValueError("Scenario is missing current_institution_id.")
 
-        programs_rows = (
-            self._rows("catalog", "programs").in_("id", program_ids).execute().data
-            if program_ids
-            else []
-        )
+        programs_rows = self._select_in_chunks("catalog", "programs", "id", program_ids)
         programs = [Program(**self._only(Program, row)) for row in programs_rows]
         selected_institution_ids = sorted(
             set(selected_institution_ids) | {item.institution_id for item in programs}
         )
 
-        course_rows = self._rows("catalog", "recommendation_courses").execute().data
+        course_rows = self._select_all_paged("catalog", "recommendation_courses")
         courses = [Course(**self._only(Course, row)) for row in course_rows]
         course_ids = [course.id for course in courses]
-        offering_rows = (
-            self._rows("catalog", "course_offerings").in_("course_id", course_ids).execute().data
-            if course_ids
-            else []
+        offering_rows = self._select_in_chunks(
+            "catalog", "course_offerings", "course_id", course_ids
         )
         offerings = [
             CourseOffering(
@@ -146,8 +188,8 @@ class SupabaseRecommendationRepository:
             for row in offering_rows
         ]
 
-        group_rows = self._rows("policy", "course_prerequisite_groups").execute().data
-        condition_rows = self._rows("policy", "course_prerequisite_conditions").execute().data
+        group_rows = self._select_all_paged("policy", "course_prerequisite_groups")
+        condition_rows = self._select_all_paged("policy", "course_prerequisite_conditions")
         conditions_by_group: dict[str, list[PrerequisiteCondition]] = {}
         for row in condition_rows:
             condition = PrerequisiteCondition(
@@ -164,20 +206,13 @@ class SupabaseRecommendationRepository:
             for row in group_rows
         ]
 
-        requirement_rows = (
-            self._rows("policy", "requirements").in_("program_id", program_ids).execute().data
-            if program_ids
-            else []
+        requirement_rows = self._select_in_chunks(
+            "policy", "requirements", "program_id", program_ids
         )
         requirements = [self._program_requirement(row) for row in requirement_rows]
         requirement_ids = [item.id for item in requirements]
-        option_rows = (
-            self._rows("policy", "requirement_courses")
-            .in_("requirement_id", requirement_ids)
-            .execute()
-            .data
-            if requirement_ids
-            else []
+        option_rows = self._select_in_chunks(
+            "policy", "requirement_courses", "requirement_id", requirement_ids
         )
         options = [
             RequirementCourseOption(
@@ -191,7 +226,7 @@ class SupabaseRecommendationRepository:
             for row in option_rows
         ]
 
-        ge_rows = self._rows("policy", "general_education_mappings").execute().data
+        ge_rows = self._select_all_paged("policy", "general_education_mappings")
         ge_mappings = [
             GeneralEducationMapping(
                 **self._only(GeneralEducationMapping, row, exclude={"source_ids"}),
@@ -199,8 +234,8 @@ class SupabaseRecommendationRepository:
             )
             for row in ge_rows
         ]
-        equivalency_rows = (
-            self._rows("equivalency", "recommendation_course_equivalencies").execute().data
+        equivalency_rows = self._select_all_paged(
+            "equivalency", "recommendation_course_equivalencies"
         )
         equivalencies = [
             CourseEquivalency(**self._only(CourseEquivalency, row)) for row in equivalency_rows
