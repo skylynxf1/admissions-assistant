@@ -397,6 +397,50 @@ def test_publish_is_idempotent_on_second_run() -> None:
     assert report_second.source_courses_created == 0
 
 
+def test_publish_creates_course_version_for_new_source_course_with_code_title() -> None:
+    client = _seeded_client()
+
+    report = publish_equivalencies(client, [_direct_intent()])
+
+    assert report.source_course_versions_created == 1
+    courses = client.schema("catalog").table("courses").rows
+    bellevue_course = next(row for row in courses if row["institution_id"] == BELLEVUE_ID)
+    versions = client.schema("catalog").table("course_versions").rows
+    assert len(versions) == 1
+    assert versions[0]["course_id"] == bellevue_course["id"]
+    assert versions[0]["title"] == "MATH& 151"
+
+
+def test_publish_does_not_duplicate_version_when_source_course_already_has_one() -> None:
+    client = _seeded_client()
+    # Pre-seed the Bellevue course AND its version, mirroring a course that
+    # already existed (e.g. from a seed script) before this run.
+    key = f"{BELLEVUE_ID}:Main:MATH&:151"
+    course_id = str(uuid.uuid5(NAMESPACE, key))
+    client.schema("catalog").table("courses").rows.append(
+        {
+            "id": course_id,
+            "institution_id": BELLEVUE_ID,
+            "subject": "MATH&",
+            "number": "151",
+            "campus": "Main",
+            "active": True,
+        }
+    )
+    existing_version_id = str(uuid.uuid5(NAMESPACE, f"{course_id}#v"))
+    client.schema("catalog").table("course_versions").rows.append(
+        {"id": existing_version_id, "course_id": course_id, "title": "MATH& 151"}
+    )
+
+    report = publish_equivalencies(client, [_direct_intent()])
+
+    assert report.source_courses_created == 0
+    assert report.source_course_versions_created == 0
+    versions = client.schema("catalog").table("course_versions").rows
+    assert len(versions) == 1
+    assert versions[0]["id"] == existing_version_id
+
+
 def test_publish_deduplicates_shared_source_course_within_one_run() -> None:
     client = _seeded_client()
     record_a = EquivalencyRecord(

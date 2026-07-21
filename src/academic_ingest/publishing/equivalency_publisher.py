@@ -186,6 +186,7 @@ class PublishReport:
 
     equivalencies_upserted: int = 0
     source_courses_created: int = 0
+    source_course_versions_created: int = 0
     destinations_resolved: int = 0
     destinations_as_category: int = 0
     unresolved_destinations: list[str] = field(default_factory=list)
@@ -234,6 +235,42 @@ def _ensure_source_course(
         }
     ).execute()
     return course_id, True
+
+
+def _ensure_source_course_version(client: Any, course_id: str, code: str) -> bool:
+    """Select-then-insert a minimal `catalog.course_versions` row for a Bellevue
+    source course, so it is visible through the `catalog.recommendation_courses`
+    view (which JOINs `courses` to `course_versions`).
+
+    Returns `created` (True if a version row was inserted). Never updates an
+    existing version's id, and never inserts a second version for a course that
+    already has one.
+
+    `title` is set to the course's own code (e.g. "CS 211"), NOT a fabricated
+    descriptive name — we never ingested Bellevue's catalog, and the
+    equivalency guide's source cell only gives the code, so a real title is
+    not available.
+    """
+    existing = (
+        client.schema("catalog")
+        .table("course_versions")
+        .select("id")
+        .eq("course_id", course_id)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if existing:
+        return False
+    version_id = str(uuid.uuid5(NAMESPACE, f"{course_id}#v"))
+    client.schema("catalog").table("course_versions").insert(
+        {
+            "id": version_id,
+            "course_id": course_id,
+            "title": code,
+        }
+    ).execute()
+    return True
 
 
 def _resolve_uw_course(client: Any, institution_id: str, subject: str, number: str) -> str | None:
@@ -362,6 +399,11 @@ def publish_equivalencies(
                 source_course_id_cache[key] = course_id
                 if created:
                     report.source_courses_created += 1
+                version_created = _ensure_source_course_version(
+                    client, course_id, f"{subject} {number}"
+                )
+                if version_created:
+                    report.source_course_versions_created += 1
             source_course_ids.append(source_course_id_cache[key])
 
         destination_course_id = None
