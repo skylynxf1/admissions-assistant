@@ -108,8 +108,10 @@ async def _run_live(
         async with engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
 
-    client = fetcher if fetcher is not None else SafeFetchClient(
-        config, contact_email=contact_email, network_enabled=True
+    client = (
+        fetcher
+        if fetcher is not None
+        else SafeFetchClient(config, contact_email=contact_email, network_enabled=True)
     )
 
     try:
@@ -137,9 +139,7 @@ async def _run_live(
 
             for url in urls:
                 if not config.is_allowed_url(url):
-                    skipped.append(
-                        SkippedSource(url=url, reason="source_outside_configured_scope")
-                    )
+                    skipped.append(SkippedSource(url=url, reason="source_outside_configured_scope"))
                     continue
 
                 parsed = urlsplit(url)
@@ -156,9 +156,7 @@ async def _run_live(
                         robots_cache[origin] = None
                 robots = robots_cache[origin]
                 if robots is None:
-                    skipped.append(
-                        SkippedSource(url=url, reason="robots_unavailable_fail_closed")
-                    )
+                    skipped.append(SkippedSource(url=url, reason="robots_unavailable_fail_closed"))
                     continue
                 decision = robots.evaluate(url)
                 if not decision.allowed:
@@ -207,8 +205,7 @@ async def _run_live(
                     stored_page.id,
                     raw,
                     job.id,
-                    response_headers=fetched.response_headers
-                    or {"content-type": content_type},
+                    response_headers=fetched.response_headers or {"content-type": content_type},
                     parser_version="live-ingest-v1",
                     raw_content_location=source_url,
                 )
@@ -231,9 +228,7 @@ async def _run_live(
                 adapter_registry=build_default_adapter_registry(),
             )
             candidates = [
-                record
-                for record in pipeline.records
-                if isinstance(record, EvidenceBackedRecord)
+                record for record in pipeline.records if isinstance(record, EvidenceBackedRecord)
             ]
             publication = await PublishingService(
                 session,
@@ -248,9 +243,7 @@ async def _run_live(
             job.pages_discovered = len(urls)
             job.pages_fetched = len(contexts)
             job.records_created = len(publication.published)
-            job.warnings = [
-                f"{warning.code}: {warning.message}" for warning in pipeline.warnings
-            ]
+            job.warnings = [f"{warning.code}: {warning.message}" for warning in pipeline.warnings]
             job.errors = [f"{error.code}: {error.message}" for error in pipeline.errors]
             await session.commit()
             log_pipeline_summary(pipeline, job.id)

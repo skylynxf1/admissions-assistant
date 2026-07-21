@@ -91,9 +91,7 @@ class TestResolveOutcomesRunsIdenticallyAcrossPathways:
         assert outcomes[0].destination_outcomes == ["UW TEST 101"]
         assert outcomes[0].evidence_refs == ["ev-direct"]
 
-    def test_normalized_code_matches_regardless_of_case_and_spacing(
-        self, pathway_key: str
-    ) -> None:
+    def test_normalized_code_matches_regardless_of_case_and_spacing(self, pathway_key: str) -> None:
         repo = _repo_for(pathway_key)
 
         outcomes = resolve_outcomes(
@@ -127,9 +125,7 @@ class TestResolveOutcomesRunsIdenticallyAcrossPathways:
         assert outcomes[0].detail is not None
         assert "SRC 202" in outcomes[0].detail
 
-    def test_unmapped_course_is_not_found_never_explicit_no_credit(
-        self, pathway_key: str
-    ) -> None:
+    def test_unmapped_course_is_not_found_never_explicit_no_credit(self, pathway_key: str) -> None:
         repo = _repo_for(pathway_key)
 
         outcomes = resolve_outcomes(
@@ -174,7 +170,6 @@ class TestResolveOutcomesRunsIdenticallyAcrossPathways:
             TransferState.direct_equivalent,
             TransferState.explicit_no_credit,
         ]
-
 
     def test_multiple_matching_records_with_same_state_yields_that_state(
         self, pathway_key: str

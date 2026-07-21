@@ -472,9 +472,7 @@ def test_upsert_courses_selects_null_campus_row_with_is_filter() -> None:
 
 def test_upsert_courses_matches_existing_null_campus_row_instead_of_reinserting() -> None:
     client = _FakeClient()
-    client.catalog.tables["courses"] = _FakeTable(
-        existing_rows=[{"id": "existing-course-uuid"}]
-    )
+    client.catalog.tables["courses"] = _FakeTable(existing_rows=[{"id": "existing-course-uuid"}])
 
     count, id_map = _upsert_courses(client, [_NULL_CAMPUS_COURSE_ROW], "institution-uuid")
 

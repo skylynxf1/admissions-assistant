@@ -46,8 +46,7 @@ class TestSupabaseMapping:
     def test_direct_equivalent_maps_to_direct_equivalent(self):
         """Assert DB 'direct_equivalent' maps to TransferState.direct_equivalent."""
         assert (
-            SUPABASE_MAPPING_TYPE_TO_STATE["direct_equivalent"]
-            is TransferState.direct_equivalent
+            SUPABASE_MAPPING_TYPE_TO_STATE["direct_equivalent"] is TransferState.direct_equivalent
         )
 
     def test_all_db_enum_values_are_mapped(self):
@@ -65,9 +64,9 @@ class TestSupabaseMapping:
             "manual_review",
         }
         for db_value in db_enum_values:
-            assert (
-                db_value in SUPABASE_MAPPING_TYPE_TO_STATE
-            ), f"Missing mapping for DB value: {db_value}"
+            assert db_value in SUPABASE_MAPPING_TYPE_TO_STATE, (
+                f"Missing mapping for DB value: {db_value}"
+            )
 
     def test_forward_and_inverse_mappings_are_consistent(self):
         """Assert forward and inverse mappings are consistent where both exist."""

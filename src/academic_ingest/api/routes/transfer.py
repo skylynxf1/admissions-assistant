@@ -44,9 +44,7 @@ def get_equivalency_repository() -> EquivalencyReadRepository:
     return InMemoryEquivalencyRepository(curated_records())
 
 
-EquivalencyRepositoryDep = Annotated[
-    EquivalencyReadRepository, Depends(get_equivalency_repository)
-]
+EquivalencyRepositoryDep = Annotated[EquivalencyReadRepository, Depends(get_equivalency_repository)]
 
 
 @router.post("/outcomes")
