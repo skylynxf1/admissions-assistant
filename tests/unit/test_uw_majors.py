@@ -89,3 +89,57 @@ def test_conflicting_claims_are_emitted_without_choosing_a_winner() -> None:
         ("admissions", "Minimum grade of 2.0 in STAT 311."),
         ("department", "Department page says minimum grade 2.5 in STAT 311."),
     ]
+
+
+def test_cards_fallback_does_not_crash_when_no_major_cards() -> None:
+    """Regression test for fallback path when no article.major-card or [data-major] elements exist.
+
+    This tests the fallback selector that looks for anchors nested two levels deep.
+    Ensures that mem_id property access (not method call) doesn't raise TypeError.
+    """
+    html = b"""
+    <html>
+        <body>
+            <div class="majors-list">
+                <section>
+                    <div class="major-item">
+                        <div class="major-info">
+                            <a href="https://admit.washington.edu/majors/informatics/">Informatics</a>
+                            <p>Major type: Capacity-constrained</p>
+                        </div>
+                    </div>
+                </section>
+                <section>
+                    <div class="major-item">
+                        <div class="major-info">
+                            <a href="https://admit.washington.edu/majors/computer-science/">
+                                Computer Science
+                            </a>
+                            <p>Major type: Open</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </body>
+    </html>
+    """
+
+    adapter_context = AdapterContext(
+        page=PageClassifier().classify(
+            "https://admit.washington.edu/academics/majors/",
+            html,
+            content_type="text/html",
+        ),
+        raw_content=html,
+        source_snapshot_id=uuid4(),
+        crawl_job_id=uuid4(),
+        institution_id="uw-seattle",
+        campus="Seattle",
+    )
+
+    result = MajorsIndexAdapter().extract(adapter_context)
+
+    # Verify we got programs and didn't crash
+    assert len(result.records) >= 1
+    program_names = {item.official_name for item in result.records}
+    assert "Informatics" in program_names or "Computer Science" in program_names

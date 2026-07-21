@@ -49,9 +49,9 @@ class MajorsIndexAdapter:
         seen: set[int] = set()
         for anchor in tree.css('a[href*="/majors/"]'):
             candidate = anchor.parent.parent if anchor.parent is not None else None
-            if candidate is not None and candidate.mem_id() not in seen:
+            if candidate is not None and candidate.mem_id not in seen:  # type: ignore[comparison-overlap]
                 fallback.append(candidate)
-                seen.add(candidate.mem_id())
+                seen.add(candidate.mem_id)  # type: ignore[arg-type]
         return fallback
 
     def extract(self, context: AdapterContext) -> AdapterResult:
