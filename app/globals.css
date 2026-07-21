@@ -214,6 +214,42 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .field:focus { border-color: var(--path-green); box-shadow: var(--focus-ring); }
 .field-label { display: block; margin-bottom: 0.42rem; font-size: 0.875rem; font-weight: 600; color: var(--forest); }
 
+/* Themed dropdowns: replace the native chevron with a brand one and
+   reserve room on the right so long option text never runs under it. */
+select.field {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.75rem;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234F8B6C' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.95rem center;
+  background-size: 16px 16px;
+  text-overflow: ellipsis;
+}
+select.field:hover { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23234D3C' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+select.field::-ms-expand { display: none; }
+
+/* Discoverable horizontal scroll for wide data tables. A themed, always-
+   visible scrollbar + a right-edge fade signal there are more columns to
+   the right, so nothing reads as "cut off with no way to reach it". */
+.table-scroll {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pip-mint) transparent;
+  background:
+    linear-gradient(to right, var(--surface-card) 30%, rgba(255,255,255,0)) left / 32px 100% no-repeat,
+    linear-gradient(to left, var(--surface-card) 30%, rgba(255,255,255,0)) right / 32px 100% no-repeat,
+    radial-gradient(farthest-side at 0 50%, rgba(35,77,60,.14), rgba(35,77,60,0)) left / 14px 100% no-repeat,
+    radial-gradient(farthest-side at 100% 50%, rgba(35,77,60,.14), rgba(35,77,60,0)) right / 14px 100% no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+.table-scroll::-webkit-scrollbar { height: 10px; }
+.table-scroll::-webkit-scrollbar-track { background: var(--mint-wash); border-radius: 999px; }
+.table-scroll::-webkit-scrollbar-thumb { background: var(--pip-mint); border-radius: 999px; border: 2px solid var(--mint-wash); }
+.table-scroll::-webkit-scrollbar-thumb:hover { background: var(--path-green); }
+
 .primary-button {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
   min-height: 3rem; border-radius: 14px; background: var(--path-green); padding: 0 1.35rem;

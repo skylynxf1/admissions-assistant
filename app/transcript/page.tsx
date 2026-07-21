@@ -411,7 +411,7 @@ export default function TranscriptPage() {
             <button onClick={addCourse} className="primary-button mt-5"><Plus className="size-4" /> Add course</button>
           </div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full min-w-[1060px] text-left">
+          <div className="table-scroll"><table className="w-full min-w-[1060px] text-left">
             <thead className="border-b border-[var(--border)] text-xs font-semibold text-[var(--muted-ink)]"><tr><th className="px-4 py-3 font-semibold">Institution</th><th className="px-3 py-3 font-semibold">Course</th><th className="px-3 py-3 font-semibold">Title</th><th className="px-3 py-3 font-semibold">Term</th><th className="px-3 py-3 font-semibold">Attempted</th><th className="px-3 py-3 font-semibold">Earned</th><th className="px-3 py-3 font-semibold">Grade</th><th className="px-3 py-3 font-semibold">Status</th><th className="px-3 py-3 font-semibold">Source</th><th className="w-12" /></tr></thead>
             <tbody className="divide-y divide-[var(--border)]">{transcript.courses.map((course) => <tr key={course.id} className={course.extractionConfidence !== undefined && course.extractionConfidence < 0.75 ? "bg-[var(--surface-attention)]/60" : "hover:bg-[var(--mint-wash)]/40"}>
               <td className="px-4 py-2.5"><input aria-label={`Institution ${course.id}`} value={course.institution} onChange={(event) => updateCourse(course.id, { institution: event.target.value })} className="w-36 rounded-[10px] border border-transparent bg-transparent px-2 py-2 text-xs outline-none focus:border-[var(--pip-mint)] focus:bg-white" /></td>
