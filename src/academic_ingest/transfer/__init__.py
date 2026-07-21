@@ -1,0 +1,1 @@
+"""Deterministic transfer-outcome resolution."""

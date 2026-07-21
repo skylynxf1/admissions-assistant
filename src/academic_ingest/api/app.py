@@ -28,6 +28,7 @@ from academic_ingest.api.routes import (
     programs,
     review_tasks,
     sources,
+    transfer,
 )
 from academic_ingest.config.settings import Settings, load_institution_config
 from academic_ingest.db.base import Base
@@ -89,4 +90,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(policies.router)
     app.include_router(conflicts.router)
     app.include_router(review_tasks.router)
+    app.include_router(transfer.router)
     return app
