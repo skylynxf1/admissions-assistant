@@ -1,8 +1,9 @@
-"""Publish curated Bellevue College -> UW Seattle equivalencies into Supabase.
+"""Publish parsed Bellevue College -> UW Seattle equivalencies into Supabase.
 
-Moves the 15 CITED `EquivalencyRecord`s in
-`academic_ingest.transfer.curated_equivalencies` (currently served from memory by the
-resolver) into `equivalency.course_equivalencies` + `equivalency.equivalency_components`,
+Moves the 633 CITED `EquivalencyRecord`s parsed by
+`academic_ingest.transfer.guide_source.load_bellevue_guide_records()` (the same
+source served from memory by the `/transfer/outcomes` resolver) into
+`equivalency.course_equivalencies` + `equivalency.equivalency_components`,
 resolving each free-text `destination_outcome` to a real `catalog.courses` foreign key
 where possible.
 
@@ -472,15 +473,15 @@ class EquivalencyPublisher:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Publish curated Bellevue College -> UW Seattle equivalencies to Supabase."
+        description="Publish parsed Bellevue College -> UW Seattle equivalencies to Supabase."
     )
     parser.add_argument("--review-status", default="approved")
     args = parser.parse_args(argv)
 
     try:
-        from academic_ingest.transfer.curated_equivalencies import curated_records
+        from academic_ingest.transfer.guide_source import load_bellevue_guide_records
 
-        records = curated_records().get(("bellevue-college", "uw-seattle"), [])
+        records = load_bellevue_guide_records()
         intents = build_equivalency_intents(records)
         publisher = EquivalencyPublisher.from_env()
     except RuntimeError as exc:

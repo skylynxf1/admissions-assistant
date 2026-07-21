@@ -1,6 +1,6 @@
 """Deterministic parser for the UW Office of Admissions Bellevue College equivalency guide.
 
-This REPLACES hand-transcription (`academic_ingest.transfer.curated_equivalencies`) as
+This REPLACED hand-transcription (the now-deleted `curated_equivalencies` module) as
 the source of Bellevue College -> UW Seattle equivalency data. Hand-curation already
 fabricated two rows once; this module never invents a mapping — every `EquivalencyRecord`
 it produces is traced back to an exact row in the source HTML via `evidence_refs`, and any

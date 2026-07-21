@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from academic_ingest.pathways.registry import UnknownPathwayError, get_pathway, load_pathways
-from academic_ingest.transfer.curated_equivalencies import curated_records
+from academic_ingest.transfer.guide_source import load_bellevue_guide_records
 from academic_ingest.transfer.models import SourceCourseInput, TransferOutcome
 from academic_ingest.transfer.repository import (
     EquivalencyReadRepository,
@@ -35,13 +35,15 @@ class TransferOutcomeResponse(BaseModel):
 def get_equivalency_repository() -> EquivalencyReadRepository:
     """Default equivalency repository dependency.
 
-    Returns an in-memory repository built from `curated_records()` — the hand-
-    verified, cited published equivalency data in
-    `academic_ingest.transfer.curated_equivalencies` (see
+    Returns an in-memory repository built from `load_bellevue_guide_records()` —
+    equivalency data parsed deterministically from the bundled official UW
+    Bellevue College Equivalency Guide snapshot (see
     docs/equivalencies/SOURCES.md). Tests override this via
     `app.dependency_overrides`.
     """
-    return InMemoryEquivalencyRepository(curated_records())
+    return InMemoryEquivalencyRepository(
+        {("bellevue-college", "uw-seattle"): load_bellevue_guide_records()}
+    )
 
 
 EquivalencyRepositoryDep = Annotated[EquivalencyReadRepository, Depends(get_equivalency_repository)]

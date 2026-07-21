@@ -69,3 +69,51 @@ def test_post_outcomes_unknown_pathway_returns_404(client: TestClient) -> None:
     )
 
     assert response.status_code == 404
+
+
+@pytest.fixture
+def default_client() -> Iterator[TestClient]:
+    """A TestClient with NO dependency override, so /transfer/outcomes uses the
+    real default repository built from the parsed Bellevue guide."""
+    settings = Settings(
+        database_url="sqlite+aiosqlite:///:memory:",
+        network_enabled=False,
+        institution_config_path=Path("config/institutions/uw_seattle.yaml"),
+    )
+    app = create_app(settings)
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def test_default_repository_resolves_a_real_bellevue_course(default_client: TestClient) -> None:
+    # Real row from the bundled guide snapshot: "ENGL& 101" -> "ENGL 131 (5)".
+    response = default_client.post(
+        "/transfer/outcomes",
+        json={
+            "pathway_key": "bellevue-college:uw-seattle",
+            "courses": [{"code": "ENGL& 101", "title": "English Composition I"}],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    outcome = payload["outcomes"][0]
+    assert outcome["state"] == "direct_equivalent"
+    assert outcome["evidence_refs"], "resolved outcome must carry the citation forward"
+
+
+def test_default_repository_reports_not_found_for_a_nonsense_course(
+    default_client: TestClient,
+) -> None:
+    response = default_client.post(
+        "/transfer/outcomes",
+        json={
+            "pathway_key": "bellevue-college:uw-seattle",
+            "courses": [{"code": "ZZZZ 9999", "title": "Not a real course"}],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    outcome = payload["outcomes"][0]
+    assert outcome["state"] == "not_found"
