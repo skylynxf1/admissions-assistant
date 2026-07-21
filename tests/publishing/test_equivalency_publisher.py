@@ -68,6 +68,33 @@ def test_parse_destination_department_wildcard_is_none() -> None:
     assert parse_destination("ART 1XX") is None
 
 
+def test_parse_destination_ignores_trailing_source_alternatives_prose() -> None:
+    assert parse_destination("FRENCH 101 (5) for either FRCH& 121 or FRCH 131") == (
+        "FRENCH",
+        "101",
+    )
+
+
+def test_parse_destination_simple_with_credits_suffix() -> None:
+    assert parse_destination("MATH 124 (5)") == ("MATH", "124")
+
+
+def test_parse_destination_multi_word_subject() -> None:
+    assert parse_destination("BIO A 201 (5)") == ("BIO A", "201")
+
+
+def test_parse_destination_no_leading_code_is_none() -> None:
+    assert parse_destination("No credit") is None
+
+
+def test_parse_destination_genuine_destination_alternation_is_none() -> None:
+    assert parse_destination("ANTH 203 (5) or LING 203 (5)") is None
+
+
+def test_parse_destination_wildcard_alternation_is_none() -> None:
+    assert parse_destination("PHIL 2XX or ART 2XX") is None
+
+
 # ---------------------------------------------------------------------------
 # build_equivalency_intents
 # ---------------------------------------------------------------------------

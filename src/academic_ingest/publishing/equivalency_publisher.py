@@ -43,6 +43,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -83,23 +84,49 @@ def parse_course_code(code: str) -> tuple[str, str] | None:
     return subject, number
 
 
+_LEADING_DESTINATION_CODE_RE = re.compile(r"^([A-Z][A-Z&]*(?:\s+[A-Z][A-Z&]*)*)\s+(\d\S*)")
+_SOURCE_CLAUSE_RE = re.compile(r"\bfor\s+(?:either\s+)?")
+_OR_ALTERNATIVE_RE = re.compile(r"\bor\s+[A-Z][A-Z&]*(?:\s+[A-Z][A-Z&]*)*\s+\d\S*")
+
+
 def parse_destination(outcome: str) -> tuple[str, str] | None:
     """Resolve a free-text destination outcome to `(subject, number)`, or `None`.
 
-    Strips a leading "UW " prefix if present, then applies `parse_course_code`.
-    Returns `None` for non-course outcomes ("No credit", "elective credit") and for
-    wildcard numbers containing "X" ("1XX", "UW 1XX (LC)", "ART 1XX") — those are
-    categories, not specific courses, and must never be resolved to a fabricated
-    course row.
+    Unlike `parse_course_code` (used for SOURCE codes, which are bare "SUBJECT
+    NUMBER" strings), destination cells routinely carry trailing prose — e.g.
+    "FRENCH 101 (5) for either FRCH& 121 or FRCH 131". Taking the last digit-led
+    token (as `parse_course_code` does) grabs garbage from that prose, so this
+    parses the course code from the START of the string instead:
+
+    1. Strips a leading "UW " prefix if present.
+    2. Matches a leading SUBJECT (one or more uppercase/"&" tokens) immediately
+       followed by a NUMBER token starting with a digit.
+    3. Returns `None` for wildcard numbers containing "X" ("1XX", "UW 1XX (LC)",
+       "ART 1XX") — those are categories, not specific courses.
+    4. Returns `None` when the remaining text genuinely offers ALTERNATIVE
+       destination courses (e.g. "ANTH 203 (5) or LING 203 (5)"), detected as an
+       " or SUBJECT NUMBER" pattern that is not part of a "for either ... or ..."
+       clause describing SOURCE options (e.g. the FRENCH example above, where the
+       leading destination code stands and the "or" belongs to the source list).
+    5. Returns `None` if no leading code matches at all (e.g. "No credit").
     """
     text = outcome[3:] if outcome.startswith("UW ") else outcome
-    parsed = parse_course_code(text)
-    if parsed is None:
+    match = _LEADING_DESTINATION_CODE_RE.match(text)
+    if match is None:
         return None
-    _subject, number = parsed
+    subject, number = match.group(1), match.group(2)
     if "X" in number.upper():
         return None
-    return parsed
+
+    remainder = text[match.end() :]
+    source_clause = _SOURCE_CLAUSE_RE.search(remainder)
+    for or_match in _OR_ALTERNATIVE_RE.finditer(remainder):
+        if source_clause is not None and or_match.start() > source_clause.start():
+            # The "or" belongs to a "for either <source> or <source>" clause
+            # describing SOURCE alternatives, not destination ones.
+            continue
+        return None
+    return subject, number
 
 
 @dataclass
