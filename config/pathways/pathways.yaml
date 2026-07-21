@@ -1,0 +1,11 @@
+pathways:
+  - key: bellevue-college:uw-seattle
+    source_institution_id: bellevue-college
+    destination_institution_id: uw-seattle
+    destination_campus: Seattle
+    capabilities: [transfer_outcomes]
+  - key: seattle-university:uw-seattle
+    source_institution_id: seattle-university
+    destination_institution_id: uw-seattle
+    destination_campus: Seattle
+    capabilities: [transfer_outcomes]

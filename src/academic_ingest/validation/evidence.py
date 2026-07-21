@@ -12,7 +12,7 @@ from academic_ingest.models.enums import Severity
 from academic_ingest.validation.dates import validate_effective_dates
 from academic_ingest.validation.logical import validate_record_logic
 from academic_ingest.validation.models import ValidationIssue, ValidationReport
-from academic_ingest.validation.source_scope import validate_source_scope
+from academic_ingest.validation.source_scope import uw_seattle_scope
 from academic_ingest.validation.tables import (
     structured_table_evidence_matches,
     validate_table_evidence,
@@ -98,7 +98,7 @@ def validate_candidate(
                     evidence_id=evidence.id,
                 )
             )
-        issues.extend(validate_source_scope(evidence.source_url, candidate.campus))
+        issues.extend(uw_seattle_scope(evidence.source_url, candidate.campus))
         issues.extend(validate_table_evidence(evidence))
     issues.extend(validate_effective_dates(candidate.effective_from, candidate.effective_to))
     issues.extend(validate_record_logic(candidate))
