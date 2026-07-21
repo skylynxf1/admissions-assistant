@@ -14,6 +14,7 @@ from academic_ingest.discovery.link_discovery import canonicalize_url
 from academic_ingest.models.domain import (
     AdmissionsRule,
     EvidenceRecord,
+    PipelineIssue,
     Program,
     Requirement,
 )
@@ -28,6 +29,28 @@ from academic_ingest.models.enums import (
 
 COURSE_CODE = re.compile(r"\b(?:[A-Z&]{1,8}(?:\s+[A-Z&]{1,8})*)\s+(?:\d{3}[A-Z]?|[1-9]XX)\b")
 TERM_ORDER = ("autumn", "winter", "spring", "summer")
+
+# Structural (template-level) markers used by the current admit.washington.edu
+# major-detail pages, which no longer emit the `[data-requirement-kind]`
+# attributes the old fixture used. These match the WordPress template's own
+# heading wording, not any single major's content.
+REQUIREMENT_HEADING = re.compile(r"courses?\s+(required|recommended)\s+for\s+admission", re.I)
+GRADE_LINE = re.compile(r"^minimum grade(?:\s+of)?\s+(\d(?:\.\d+)?)\s+in each course", re.I)
+ONE_OF_PHRASE = re.compile(r"\bone of\b", re.I)
+CREDITS_PHRASE = re.compile(r"(\d+)\s+credits?\b", re.I)
+OTHER_THAN = re.compile(r"other than\s+" + COURSE_CODE.pattern, re.I)
+# Hyphen, en dash (U+2013), em dash (U+2014) — built via chr() to avoid an
+# ambiguous-unicode-character lint warning for the literal glyphs.
+_DASH_CHARS = "-" + chr(0x2013) + chr(0x2014)
+TITLE_AFTER_DASH = re.compile(rf"[{_DASH_CHARS}]\s*(.+)$")
+
+
+def _next_element(node: Node) -> Node | None:
+    """Walk forward past text/comment pseudo-nodes to the next element sibling."""
+    current = node.next
+    while current is not None and (current.tag is None or current.tag.startswith("-")):
+        current = current.next
+    return current
 
 
 @dataclass(frozen=True)
@@ -94,6 +117,123 @@ class MajorDetailAdapter:
             confidence_tier=ConfidenceTier.HIGH_CONFIDENCE,
             reviewer_status=ReviewStatus.NOT_REQUIRED,
         )
+
+    def _structural_requirement_name(
+        self, text: str, allowed_courses: list[str], minimum_courses: int | None
+    ) -> str:
+        if minimum_courses == 1 and allowed_courses:
+            return "One of the following courses"
+        if len(allowed_courses) == 1:
+            code = allowed_courses[0]
+            idx = text.find(code)
+            remainder = text[idx + len(code) :] if idx != -1 else text
+            title_match = TITLE_AFTER_DASH.search(remainder)
+            if title_match:
+                title = title_match.group(1).strip()
+                if title:
+                    return title[:120]
+            return code
+        if allowed_courses:
+            return "Required courses"
+        return text if len(text) <= 80 else text[:77].rstrip() + "..."
+
+    def _extract_structural_requirements(
+        self,
+        tree: HTMLParser,
+        context: AdapterContext,
+        program: Program,
+        result: AdapterResult,
+    ) -> bool:
+        """Fallback for the current admit.washington.edu template, which lists
+        requirements as `<li>` items under a "Courses REQUIRED/RECOMMENDED for
+        admission:" `<h3>` heading instead of `[data-requirement-kind]`
+        sections. One `Requirement` is emitted per bullet; a trailing
+        "Minimum grade of X in each course." bullet is not itself a
+        requirement — its grade is applied back onto the bullets in the same
+        list.
+        """
+        found_any = False
+        for heading in tree.css("h2, h3, h4"):
+            heading_text = _clean_text(heading)
+            heading_match = REQUIREMENT_HEADING.search(heading_text)
+            if heading_match is None:
+                continue
+            recommended = heading_match.group(1).lower() == "recommended"
+            list_node = _next_element(heading)
+            if list_node is None or list_node.tag not in ("ul", "ol"):
+                continue
+            group: list[Requirement] = []
+            list_id = list_node.attributes.get("id")
+            list_base_selector = f"#{list_id}" if list_id else list_node.tag
+            for li_index, li in enumerate(list_node.css("li"), start=1):
+                text = _clean_text(li)
+                if not text:
+                    continue
+                grade_match = GRADE_LINE.match(text)
+                if grade_match is not None:
+                    grade_value = Decimal(grade_match.group(1))
+                    for requirement in group:
+                        requirement.minimum_grade = grade_value
+                    continue
+                excluded_courses = {
+                    code
+                    for excluded_match in OTHER_THAN.finditer(text)
+                    for code in COURSE_CODE.findall(excluded_match.group(0))
+                }
+                allowed_courses = [
+                    code
+                    for code in dict.fromkeys(
+                        " ".join(value.split()) for value in COURSE_CODE.findall(text)
+                    )
+                    if code not in excluded_courses
+                ]
+                minimum_courses = (
+                    1
+                    if allowed_courses
+                    and (
+                        ONE_OF_PHRASE.search(text) is not None
+                        or (len(allowed_courses) >= 2 and re.search(r"\bor\b", text, re.I))
+                    )
+                    else None
+                )
+                credit_match = CREDITS_PHRASE.search(text)
+                name = self._structural_requirement_name(text, allowed_courses, minimum_courses)
+                evidence = self._evidence(
+                    context,
+                    text,
+                    selector=f"{list_base_selector} > li:nth-child({li_index})",
+                    heading=heading_text,
+                )
+                requirement = Requirement(
+                    institution_id=context.institution_id,
+                    campus=context.campus,
+                    evidence=[evidence],
+                    parser_name=self.name,
+                    parser_version=self.version,
+                    crawl_job_id=context.crawl_job_id,
+                    authority_tier=AuthorityTier.OFFICIAL_ADMISSIONS,
+                    confidence_tier=ConfidenceTier.HIGH_CONFIDENCE,
+                    review_status=ReviewStatus.NOT_REQUIRED,
+                    program_id=program.id,
+                    requirement_type=(
+                        RequirementType.RECOMMENDED_PREPARATION
+                        if recommended
+                        else RequirementType.MAJOR_ADMISSION
+                    ),
+                    name=name,
+                    description=text,
+                    minimum_credits=(
+                        Decimal(credit_match.group(1)) if credit_match is not None else None
+                    ),
+                    minimum_courses=minimum_courses,
+                    allowed_courses=allowed_courses,
+                    mandatory=not recommended,
+                    recommended=recommended,
+                )
+                group.append(requirement)
+                found_any = True
+            result.requirements.extend(group)
+        return found_any
 
     def extract(self, context: AdapterContext) -> AdapterResult:
         tree = HTMLParser(context.raw_content)
@@ -164,62 +304,79 @@ class MajorDetailAdapter:
 
         notes = tree.css_first("#notes")
         footnote_context = _clean_text(notes) if notes is not None else None
-        for section in tree.css("[data-requirement-kind]"):
-            kind = (section.attributes.get("data-requirement-kind") or "").lower()
-            section_heading = section.css_first("h2, h3, h4")
-            requirement_name = (
-                _clean_text(section_heading).rstrip(":")
-                if section_heading is not None
-                else "Major admission requirement"
-            )
-            section_text = _clean_text(section)
-            grade_match = re.search(
-                r"minimum grade(?: of)?\s+(\d(?:\.\d+)?)", section_text, re.IGNORECASE
-            )
-            credit_match = re.search(r"\b(?:at least\s+)?(\d+) credits?\b", section_text, re.I)
-            allowed_courses = list(
-                dict.fromkeys(
-                    " ".join(value.split()) for value in COURSE_CODE.findall(section_text)
+        requirement_kind_sections = tree.css("[data-requirement-kind]")
+        if requirement_kind_sections:
+            for section in requirement_kind_sections:
+                kind = (section.attributes.get("data-requirement-kind") or "").lower()
+                section_heading = section.css_first("h2, h3, h4")
+                requirement_name = (
+                    _clean_text(section_heading).rstrip(":")
+                    if section_heading is not None
+                    else "Major admission requirement"
                 )
-            )
-            recommended = kind == "recommended"
-            evidence = self._evidence(
-                context,
-                section_text,
-                selector=_selector(section),
-                heading=requirement_name,
-                footnote=footnote_context if not recommended else None,
-            )
-            result.requirements.append(
-                Requirement(
-                    institution_id=context.institution_id,
-                    campus=context.campus,
-                    evidence=[evidence],
-                    parser_name=self.name,
-                    parser_version=self.version,
-                    crawl_job_id=context.crawl_job_id,
-                    authority_tier=AuthorityTier.OFFICIAL_ADMISSIONS,
-                    confidence_tier=ConfidenceTier.HIGH_CONFIDENCE,
-                    review_status=ReviewStatus.NOT_REQUIRED,
-                    program_id=program.id,
-                    requirement_type=(
-                        RequirementType.RECOMMENDED_PREPARATION
-                        if recommended
-                        else RequirementType.MAJOR_ADMISSION
-                    ),
-                    name=requirement_name,
-                    description=section_text,
-                    minimum_credits=(
-                        Decimal(credit_match.group(1)) if credit_match is not None else None
-                    ),
-                    minimum_grade=(
-                        Decimal(grade_match.group(1)) if grade_match is not None else None
-                    ),
-                    allowed_courses=allowed_courses,
-                    mandatory=not recommended,
-                    recommended=recommended,
+                section_text = _clean_text(section)
+                grade_match = re.search(
+                    r"minimum grade(?: of)?\s+(\d(?:\.\d+)?)", section_text, re.IGNORECASE
                 )
-            )
+                credit_match = re.search(r"\b(?:at least\s+)?(\d+) credits?\b", section_text, re.I)
+                allowed_courses = list(
+                    dict.fromkeys(
+                        " ".join(value.split()) for value in COURSE_CODE.findall(section_text)
+                    )
+                )
+                recommended = kind == "recommended"
+                evidence = self._evidence(
+                    context,
+                    section_text,
+                    selector=_selector(section),
+                    heading=requirement_name,
+                    footnote=footnote_context if not recommended else None,
+                )
+                result.requirements.append(
+                    Requirement(
+                        institution_id=context.institution_id,
+                        campus=context.campus,
+                        evidence=[evidence],
+                        parser_name=self.name,
+                        parser_version=self.version,
+                        crawl_job_id=context.crawl_job_id,
+                        authority_tier=AuthorityTier.OFFICIAL_ADMISSIONS,
+                        confidence_tier=ConfidenceTier.HIGH_CONFIDENCE,
+                        review_status=ReviewStatus.NOT_REQUIRED,
+                        program_id=program.id,
+                        requirement_type=(
+                            RequirementType.RECOMMENDED_PREPARATION
+                            if recommended
+                            else RequirementType.MAJOR_ADMISSION
+                        ),
+                        name=requirement_name,
+                        description=section_text,
+                        minimum_credits=(
+                            Decimal(credit_match.group(1)) if credit_match is not None else None
+                        ),
+                        minimum_grade=(
+                            Decimal(grade_match.group(1)) if grade_match is not None else None
+                        ),
+                        allowed_courses=allowed_courses,
+                        mandatory=not recommended,
+                        recommended=recommended,
+                    )
+                )
+        else:
+            found_any = self._extract_structural_requirements(tree, context, program, result)
+            if not found_any:
+                result.warnings.append(
+                    PipelineIssue(
+                        code="major_detail_requirements_unrecognized",
+                        message=(
+                            "No recognized admission-requirement structure "
+                            "(neither [data-requirement-kind] sections nor a "
+                            "'Courses REQUIRED/RECOMMENDED for admission' heading "
+                            "followed by a list) was found on this major detail page."
+                        ),
+                        source_url=context.page.url,
+                    )
+                )
 
         department_section = tree.css_first("#department-admission")
         if department_section is not None:
