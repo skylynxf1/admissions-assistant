@@ -10,8 +10,10 @@ import {
 import { useApp } from "@/components/app-provider";
 import { PipAssistant, StatusChip } from "@/components/ui";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { academicPlanningServices } from "@/lib/services";
 import type { CourseRecord, ExamCredit, TranscriptData } from "@/lib/types";
 import type { TranscriptPipelineResult, TranscriptWarningSeverity, TranscriptWarningState } from "@/lib/transcript/types";
+import type { TransferOutcomeServiceResult } from "@/lib/services/interfaces";
 
 type InputChoice = "pdf" | "manual" | null;
 type ProgressStage = "uploading" | "parsing" | "extracting" | "validating" | "review";
@@ -143,6 +145,8 @@ export default function TranscriptPage() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [sourceCourse, setSourceCourse] = useState<CourseRecord | null>(null);
   const [examOpen, setExamOpen] = useState(true);
+  const [transferChecking, setTransferChecking] = useState(false);
+  const [transferResult, setTransferResult] = useState<TransferOutcomeServiceResult | null>(null);
 
   const processOneFile = async (file: File | null, token: string | null) => {
     const form = new FormData();
@@ -282,6 +286,21 @@ export default function TranscriptPage() {
         ? `/api/transcript-documents/${course.sourceDocumentId}/courses/${course.normalizedRecordId}`
         : `/api/transcript-documents/${course.sourceDocumentId}/courses`;
       await fetch(path, { method: course.normalizedRecordId ? "PATCH" : "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    }
+  };
+
+  const checkTransferOutcomes = async () => {
+    setTransferChecking(true);
+    try {
+      // Pure function of its arguments: course codes are passed in explicitly, the
+      // service never reaches into React state or storage on its own.
+      const result = await academicPlanningServices.transferOutcomes.resolve({
+        pathwayKey: "bellevue-college:uw-seattle",
+        courses: transcript.courses.map((course) => ({ code: course.code, title: course.title })),
+      });
+      setTransferResult(result);
+    } finally {
+      setTransferChecking(false);
     }
   };
 
@@ -426,6 +445,54 @@ export default function TranscriptPage() {
               <td className="pr-3"><button aria-label={`Delete ${course.code || "course"}`} onClick={() => void removeCourse(course)} className="rounded-[10px] p-2 text-[var(--muted-ink)]/50 hover:bg-[var(--surface-danger)] hover:text-[var(--danger)]"><Trash2 className="size-4" /></button></td>
             </tr>)}</tbody>
           </table></div>
+        )}
+      </section>
+
+      <section className="card mt-4 p-5">
+        <h2 className="text-base font-bold text-[var(--forest)]">UW transfer outcomes</h2>
+        <p className="mt-1 text-xs text-[var(--muted-ink)]">
+          Live, cited data from the official UW equivalency guide — this is real backend data, unlike the sample policy analysis shown elsewhere on this page.
+        </p>
+        <button
+          onClick={() => void checkTransferOutcomes()}
+          disabled={transferChecking || transcript.courses.length === 0}
+          className="primary-button mt-3"
+        >
+          {transferChecking ? "Checking…" : "Check UW transfer outcomes"}
+        </button>
+        {transferChecking && <p className="mt-2 text-xs text-[var(--muted-ink)]">Contacting the UW equivalency service…</p>}
+        {!transferChecking && transferResult && !transferResult.available && (
+          <p className="mt-3 rounded-[var(--radius-control)] border border-[var(--butter)] bg-[var(--surface-attention)] px-4 py-3 text-sm text-[#4C380A]">
+            {transferResult.unavailableReason ?? "UW transfer outcomes are not available right now."}
+          </p>
+        )}
+        {!transferChecking && transferResult?.available && (
+          transferResult.outcomes.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--muted-ink)]">No cited UW outcomes were found for these course codes.</p>
+          ) : (
+            <div className="table-scroll mt-3">
+              <table className="w-full min-w-[640px] text-left">
+                <thead className="border-b border-[var(--border)] text-xs font-semibold text-[var(--muted-ink)]">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Source course</th>
+                    <th className="px-3 py-2 font-semibold">State</th>
+                    <th className="px-3 py-2 font-semibold">UW outcome</th>
+                    <th className="px-3 py-2 font-semibold">Citation</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {transferResult.outcomes.map((outcome, index) => (
+                    <tr key={`${outcome.source_course.code}-${index}`}>
+                      <td className="px-3 py-2.5 text-sm font-medium text-[var(--forest)]" style={{ fontFamily: "var(--font-data)" }}>{outcome.source_course.code}</td>
+                      <td className="px-3 py-2.5 text-sm">{outcome.state}</td>
+                      <td className="px-3 py-2.5 text-sm">{outcome.destination_outcomes.join(", ") || "—"}</td>
+                      <td className="px-3 py-2.5 text-xs text-[var(--muted-ink)]">{outcome.evidence_refs[0] ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         )}
       </section>
 

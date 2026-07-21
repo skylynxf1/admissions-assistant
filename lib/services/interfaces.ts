@@ -13,6 +13,7 @@ import type {
   TranscriptData,
   VerificationItem,
 } from "@/lib/types";
+import type { TransferOutcome } from "@/lib/transfer/types";
 
 export interface TranscriptParser {
   parse(fileName?: string): Promise<TranscriptData>;
@@ -58,6 +59,25 @@ export interface UncertaintyEscalationHandler {
   draftEmail(item: VerificationItem, input: AcademicAnalysisInput): Promise<DraftEmail>;
 }
 
+// Real, cited UW transfer outcomes (Bellevue College -> UW Seattle). Unlike the other
+// services above, this one has a working non-mock implementation — see
+// lib/services/real/transfer-outcomes.ts. The adapter is a pure function of its input
+// arguments; it must never read React context, localStorage, or other app state.
+export interface TransferOutcomeRequestInput {
+  pathwayKey: string;
+  courses: { code: string; title?: string | null }[];
+}
+
+export interface TransferOutcomeServiceResult {
+  available: boolean; // false when the backend is not reachable/configured
+  unavailableReason?: string; // human-readable, shown in the UI
+  outcomes: TransferOutcome[];
+}
+
+export interface TransferOutcomeService {
+  resolve(input: TransferOutcomeRequestInput): Promise<TransferOutcomeServiceResult>;
+}
+
 export interface AcademicPlanningServices {
   transcriptParser: TranscriptParser;
   normalizer: AcademicRecordNormalizer;
@@ -70,4 +90,5 @@ export interface AcademicPlanningServices {
   scenarioSimulator: ScenarioSimulator;
   advisorChat: AdvisorChatService;
   uncertaintyHandler: UncertaintyEscalationHandler;
+  transferOutcomes: TransferOutcomeService;
 }

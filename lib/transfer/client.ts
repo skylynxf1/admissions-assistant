@@ -12,7 +12,9 @@ export async function fetchTransferOutcomes(
   const baseUrl = opts.baseUrl ?? process.env.ACADEMIC_INGEST_SERVICE_URL;
   if (!baseUrl) throw new Error("ACADEMIC_INGEST_SERVICE_URL is not configured");
 
-  const fetchImpl = opts.fetchImpl ?? fetch;
+  // Wrap (rather than assign bare `fetch`) so the default doesn't rely on the receiver
+  // being the global object — same detached-`this` hazard as the browser-side service.
+  const fetchImpl = opts.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   const response = await fetchImpl(`${baseUrl.replace(/\/$/, "")}/transfer/outcomes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
