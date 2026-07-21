@@ -144,9 +144,13 @@ class RecommendationService:
                 or course.institution_id != dataset.scenario.current_institution_id
             ):
                 continue
+            course_offerings = offerings.get(course.id, [])
+            availability_unknown = not course_offerings
             if course.id in completed_ids:
                 reason = "Course is already completed."
-            elif not self._offered_in_term(offerings.get(course.id, []), target_term):
+            elif course_offerings and not self._offered_in_term(course_offerings, target_term):
+                # Offering rows exist but none confirm/typically-offer the target term:
+                # this is positive evidence of non-availability, so exclusion is correct.
                 reason = f"No confirmed or typical offering for {target_term}."
             elif not (eligibility.eligible or eligibility.eligible_with_concurrent_enrollment):
                 missing = [
@@ -178,7 +182,10 @@ class RecommendationService:
                     else:
                         candidates.append(
                             CandidateCourse(
-                                course=course, eligibility=eligibility, uncertain=uncertain
+                                course=course,
+                                eligibility=eligibility,
+                                uncertain=uncertain,
+                                availability_unknown=availability_unknown,
                             )
                         )
             if reason:
@@ -211,6 +218,18 @@ class RecommendationService:
             all_program_priorities=priorities,
             selected_institution_count=len(dataset.scenario.selected_institution_ids),
         )
+        warnings = deterministic_warnings(
+            features, candidate.eligibility.eligible_with_concurrent_enrollment
+        )
+        if candidate.availability_unknown:
+            # No offering rows exist for this course at all, so term availability is
+            # genuinely unknown. It must not be excluded or presented as confirmed —
+            # surface an explicit warning instead. See approved design note on
+            # not asserting availability without verified schedule data.
+            warnings.append(
+                "No schedule/offering data was found for this course; term availability "
+                "is unknown and has not been confirmed."
+            )
         return CourseRecommendation(
             course_id=candidate.course.id,
             course_code=candidate.course.course_code,
@@ -227,9 +246,7 @@ class RecommendationService:
                 features.equivalency_confidence,
             ),
             reasons=deterministic_reasons(features),
-            warnings=deterministic_warnings(
-                features, candidate.eligibility.eligible_with_concurrent_enrollment
-            ),
+            warnings=warnings,
             source_ids=features.source_ids,
         )
 

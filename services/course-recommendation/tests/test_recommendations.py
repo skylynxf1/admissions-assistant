@@ -3,14 +3,18 @@ from __future__ import annotations
 import pytest
 from app.models import (
     Confidence,
+    Course,
+    CourseOffering,
     CourseRecommendationFeatures,
+    GeneralEducationMapping,
+    OfferingStatus,
     RecommendationRequest,
     RecommendationWeightConfig,
     StudentCourse,
     StudentCourseStatus,
 )
 from app.repository import InMemoryRecommendationRepository
-from app.sample_data import SCENARIO_ID, UW
+from app.sample_data import BC, SCENARIO_ID, UW
 from app.scoring import WeightedRecommendationScorer, usefulness_label
 from app.service import RecommendationService, scenario_fingerprint
 
@@ -157,6 +161,89 @@ async def test_target_term_offering_exclusion(dataset):
     response = await response_for(dataset, target_term="autumn-2026")
     excluded = next(item for item in response.excluded_courses if item.course_id == "linear")
     assert "No confirmed or typical offering" in excluded.reason
+
+
+@pytest.mark.asyncio
+async def test_course_with_no_offering_data_is_not_excluded(dataset):
+    # No offering rows exist for this course at all: availability is genuinely
+    # unknown, not confirmed absent, so it must remain a candidate.
+    dataset.courses.append(
+        Course(
+            id="unscheduled",
+            institution_id=BC,
+            course_code="PHIL 101",
+            title="Intro to Philosophy",
+            credits_min=5,
+            confidence=Confidence.HIGH,
+        )
+    )
+    dataset.general_education_mappings.append(
+        GeneralEducationMapping(
+            id="ge-unscheduled-uw",
+            course_id="unscheduled",
+            institution_id=UW,
+            category_code="HUM",
+            category_name="Humanities",
+            status="CONFIRMED",
+            confidence=Confidence.HIGH,
+        )
+    )
+    response = await response_for(dataset, target_term="autumn-2026")
+    assert "unscheduled" not in {item.course_id for item in response.excluded_courses}
+    rec = recommendation(response, "unscheduled")
+    assert any(
+        "availability" in warning.lower() and "unknown" in warning.lower()
+        for warning in rec.warnings
+    )
+
+
+@pytest.mark.asyncio
+async def test_course_with_explicit_not_offered_evidence_is_still_excluded(dataset):
+    # Offering data exists and explicitly says NOT_OFFERED for the target term:
+    # this is real evidence of non-availability, so exclusion remains correct.
+    dataset.courses.append(
+        Course(
+            id="never-scheduled",
+            institution_id=BC,
+            course_code="PHIL 102",
+            title="Ethics",
+            credits_min=5,
+            confidence=Confidence.HIGH,
+        )
+    )
+    dataset.general_education_mappings.append(
+        GeneralEducationMapping(
+            id="ge-never-scheduled-uw",
+            course_id="never-scheduled",
+            institution_id=UW,
+            category_code="HUM",
+            category_name="Humanities",
+            status="CONFIRMED",
+            confidence=Confidence.HIGH,
+        )
+    )
+    dataset.offerings.append(
+        CourseOffering(
+            id="offering-never-scheduled-autumn-2026",
+            course_id="never-scheduled",
+            academic_year=2026,
+            term_name="autumn-2026",
+            offering_status=OfferingStatus.NOT_OFFERED,
+        )
+    )
+    response = await response_for(dataset, target_term="autumn-2026")
+    excluded = next(
+        item for item in response.excluded_courses if item.course_id == "never-scheduled"
+    )
+    assert "No confirmed or typical offering" in excluded.reason
+    assert "never-scheduled" not in {item.course_id for item in response.recommendations}
+
+
+@pytest.mark.asyncio
+async def test_course_confirmed_offered_in_term_is_unaffected(dataset):
+    response = await response_for(dataset, target_term="autumn-2026")
+    calc2 = recommendation(response, "calc2")
+    assert not any("schedule/offering data" in warning.lower() for warning in calc2.warnings)
 
 
 def test_deterministic_score_calculation_has_complete_breakdown():

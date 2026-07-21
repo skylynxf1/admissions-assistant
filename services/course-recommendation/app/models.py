@@ -270,6 +270,7 @@ class CandidateCourse(FrozenModel):
     course: Course
     eligibility: CourseEligibilityResult
     uncertain: bool = False
+    availability_unknown: bool = False
 
 
 class CourseRecommendationFeatures(BaseModel):
