@@ -1,5 +1,8 @@
-import { createSampleTranscript } from "@/data/sample-transcript";
-import { getMajor, getSchool, sampleCitations, schoolCatalog } from "@/data/sample-policies";
+// Relative (not "@/…") on purpose: this module is imported directly by the Node test
+// runner (node --experimental-strip-types), which does not resolve tsconfig "@/*"
+// path aliases for value imports — only Next's bundler does.
+import { createSampleTranscript } from "../../data/sample-transcript.ts";
+import { getMajor, getSchool, sampleCitations, schoolCatalog } from "../../data/sample-policies.ts";
 import type {
   AcademicAnalysisInput,
   AdvisorAnswer,
@@ -30,6 +33,9 @@ import type {
   RequirementEvaluator,
   ScenarioSimulator,
   TranscriptParser,
+  TransferOutcomeRequestInput,
+  TransferOutcomeService,
+  TransferOutcomeServiceResult,
   UncertaintyEscalationHandler,
   VerificationEvaluator,
 } from "@/lib/services/interfaces";
@@ -614,14 +620,31 @@ function buildAlerts(input: AcademicAnalysisInput, credits: CreditSummary, equiv
 
 // MOCK IMPLEMENTATION: orchestrates all interfaces so the UI never owns analysis rules.
 export class MockScenarioSimulator implements ScenarioSimulator {
+  // Explicit fields (not constructor parameter properties): Node's
+  // --experimental-strip-types is erasable-syntax-only and cannot parse TS parameter
+  // properties, and this module is imported directly by the Node test runner.
+  private readonly policyRetrieval: PolicyRetrievalService;
+  private readonly equivalencyAnalyzer: EquivalencyAnalyzer;
+  private readonly verificationEvaluator: VerificationEvaluator;
+  private readonly requirementEvaluator: RequirementEvaluator;
+  private readonly prerequisiteGraph: PrerequisiteGraphService;
+  private readonly recommendationEngine: CourseRecommendationEngine;
+
   constructor(
-    private readonly policyRetrieval: PolicyRetrievalService,
-    private readonly equivalencyAnalyzer: EquivalencyAnalyzer,
-    private readonly verificationEvaluator: VerificationEvaluator,
-    private readonly requirementEvaluator: RequirementEvaluator,
-    private readonly prerequisiteGraph: PrerequisiteGraphService,
-    private readonly recommendationEngine: CourseRecommendationEngine,
-  ) {}
+    policyRetrieval: PolicyRetrievalService,
+    equivalencyAnalyzer: EquivalencyAnalyzer,
+    verificationEvaluator: VerificationEvaluator,
+    requirementEvaluator: RequirementEvaluator,
+    prerequisiteGraph: PrerequisiteGraphService,
+    recommendationEngine: CourseRecommendationEngine,
+  ) {
+    this.policyRetrieval = policyRetrieval;
+    this.equivalencyAnalyzer = equivalencyAnalyzer;
+    this.verificationEvaluator = verificationEvaluator;
+    this.requirementEvaluator = requirementEvaluator;
+    this.prerequisiteGraph = prerequisiteGraph;
+    this.recommendationEngine = recommendationEngine;
+  }
 
   async simulate(input: AcademicAnalysisInput): Promise<AnalysisResult> {
     const [, equivalencies, prerequisiteChains] = await Promise.all([
@@ -720,6 +743,21 @@ export class MockUncertaintyEscalationHandler implements UncertaintyEscalationHa
         term: item.sourceTerm,
         question: item.question,
       },
+    };
+  }
+}
+
+// MOCK IMPLEMENTATION: unlike the other mocks above, this service has a real backend
+// (lib/services/real/transfer-outcomes.ts) that is wired in per-service via
+// NEXT_PUBLIC_USE_REAL_TRANSFER_OUTCOMES. In mock mode it must not fabricate cited
+// outcomes — it honestly reports that the live service is not enabled.
+export class MockTransferOutcomeService implements TransferOutcomeService {
+  async resolve(input: TransferOutcomeRequestInput): Promise<TransferOutcomeServiceResult> {
+    void input;
+    return {
+      available: false,
+      unavailableReason: "Live transfer service is not enabled.",
+      outcomes: [],
     };
   }
 }
